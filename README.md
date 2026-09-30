@@ -13,6 +13,7 @@ Project ini dikembangkan untuk mengeksplorasi pola harga beras antarwilayah, ant
 File:
 
 `Harga_Beras_Indonesia_Jan_Jun_2026.xlsx`
+
 sumber: https://www.bi.go.id/hargapangan/TabelHarga/ProdusenDaerah
 
 Dataset berisi harga beras bulanan dari **Januari hingga Juni 2026** berdasarkan provinsi dan jenis/kualitas beras.
@@ -57,6 +58,7 @@ Kategori tersebut mengikuti klasifikasi komoditas beras yang digunakan dalam **P
 File:
 
 `Rata-rata Harga Beras di Tingkat Perdagangan Besar (Grosir) Indonesia, 2026.xlsx`
+
 sumber: https://www.bps.go.id/id/statistics-table/2/Mjk1IzI=/rata-rata-harga-beras-di-tingkat-perdagangan-besar--grosir--indonesia.html
 
 Dataset ini berisi rata-rata harga beras di tingkat perdagangan besar atau grosir secara nasional.
