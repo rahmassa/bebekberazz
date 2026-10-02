@@ -83,7 +83,7 @@ Dataset berisi harga beras berdasarkan:
 
 Periode yang tersedia saat ini:
 
-**Januari–Juni 2026**
+**Januari–Agustus 2026**
 
 Dataset saat ini mencakup:
 
