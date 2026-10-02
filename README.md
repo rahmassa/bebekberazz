@@ -1,67 +1,48 @@
-# Analisis Harga Beras Indonesia 2026
+# 🦆 BebekBerazz — Indonesian Rice Price Data Warehouse & Analytics
 
-Repository ini berisi dataset dan pengembangan analisis mengenai **harga beras di Indonesia pada tahun 2026**.
+Project **BebekBerazz** merupakan project akhir Data Warehousing yang mengintegrasikan beberapa sumber data harga beras di Indonesia untuk membangun sistem penyimpanan, pengolahan, analisis, dan visualisasi harga beras berbasis **DuckDB, DuckLake, dan Streamlit**.
 
-Analisis menggunakan dua kelompok data utama, yaitu harga beras berdasarkan **provinsi dan jenis/kualitas beras** serta rata-rata **harga beras pada tingkat perdagangan besar (grosir) secara nasional**.
+Project ini menggunakan tiga kelompok data utama yang disebut sebagai **“3 Bebek”**:
 
-Project ini dikembangkan untuk mengeksplorasi pola harga beras antarwilayah, antarjenis beras, serta perubahan harga dari waktu ke waktu. Hasil analisis nantinya akan dikembangkan dalam bentuk visualisasi data, dashboard, atau aplikasi web interaktif.
+1. 🦆 **Bebek Grosir** — harga beras tingkat perdagangan besar/grosir nasional dari BPS.
+2. 🦆 **Bebek Provinsi PIHPS** — harga beras berdasarkan provinsi dan jenis/kualitas beras dari PIHPS Bank Indonesia.
+3. 🦆 **Bebek Pasar SP2KP** — harga beras berdasarkan pasar di kabupaten/kota dari SP2KP Kementerian Perdagangan.
 
-## Dataset
-
-### 1. Harga Beras Menurut Provinsi dan Jenis Beras
-
-File:
-
-`Harga_Beras_Indonesia_Jan_Jun_2026.xlsx`
-
-sumber: https://www.bi.go.id/hargapangan/TabelHarga/ProdusenDaerah
-
-Dataset berisi harga beras bulanan dari **Januari hingga Juni 2026** berdasarkan provinsi dan jenis/kualitas beras.
-
-Struktur utama dataset:
-
-| Kolom | Keterangan |
-|---|---|
-| No | Nomor observasi |
-| Provinsi | Nama provinsi |
-| Jenis Beras | Kategori/kualitas beras |
-| Januari 2026 | Harga rata-rata Januari 2026 |
-| Februari 2026 | Harga rata-rata Februari 2026 |
-| Maret 2026 | Harga rata-rata Maret 2026 |
-| April 2026 | Harga rata-rata April 2026 |
-| Mei 2026 | Harga rata-rata Mei 2026 |
-| Juni 2026 | Harga rata-rata Juni 2026 |
-
-Dataset saat ini mencakup:
-
-- **34 provinsi/wilayah**
-- **132 kombinasi provinsi dan jenis beras**
-- Periode **Januari–Juni 2026**
-- Harga dalam **rupiah per kilogram**
-- Beberapa observasi tidak tersedia dan dibiarkan sebagai nilai kosong
-
-Jenis beras yang terdapat dalam dataset:
-
-- Beras Kualitas Bawah 1
-- Beras Kualitas Bawah 2
-- Beras Kualitas Medium 1
-- Beras Kualitas Medium 2
-- Beras Kualitas Super 1
-- Beras Kualitas Super 2
-
-Kategori tersebut mengikuti klasifikasi komoditas beras yang digunakan dalam **Pusat Informasi Harga Pangan Strategis Nasional (PIHPS) Bank Indonesia**.
+Ketiga sumber memiliki tingkat granularitas yang berbeda dan akan disimpan terlebih dahulu dalam database DuckDB masing-masing, kemudian diintegrasikan ke dalam **DuckLake** untuk proses analitik dan visualisasi melalui dashboard Streamlit.
 
 ---
 
-### 2. Harga Beras Tingkat Perdagangan Besar (Grosir)
+# 🎯 Tujuan Project
 
-File:
+Project ini bertujuan membangun sebuah **data warehouse harga beras Indonesia** yang memungkinkan pengguna untuk melihat harga beras dari tingkat nasional hingga tingkat pasar.
+
+Analisis diarahkan untuk menjawab pertanyaan seperti:
+
+- Bagaimana perkembangan harga beras dari bulan ke bulan?
+- Berapa rata-rata dan median harga beras di suatu provinsi?
+- Seberapa besar kenaikan atau penurunan harga dibanding bulan sebelumnya?
+- Provinsi mana yang memiliki harga beras relatif tinggi atau rendah?
+- Seberapa besar fluktuasi harga beras di masing-masing daerah?
+- Bagaimana perbedaan harga antarjenis atau kualitas beras?
+- Bagaimana harga pada tingkat pasar dibandingkan dengan harga tingkat provinsi?
+- Bagaimana perbedaan harga daerah/pasar dengan harga grosir nasional?
+- Kabupaten/kota atau pasar mana yang mengalami perubahan harga paling besar?
+- Pasar mana yang memiliki harga relatif stabil dan pasar mana yang lebih fluktuatif?
+- Bagaimana pola harga beras jika pengguna memilih lokasi tertentu?
+
+---
+
+# 📦 Dataset
+
+## 1. 🦆 Bebek Grosir — Harga Beras Grosir Nasional
+
+**Sumber:** Badan Pusat Statistik (BPS)
+
+Dataset:
 
 `Rata-rata Harga Beras di Tingkat Perdagangan Besar (Grosir) Indonesia, 2026.xlsx`
 
-sumber: https://www.bps.go.id/id/statistics-table/2/Mjk1IzI=/rata-rata-harga-beras-di-tingkat-perdagangan-besar--grosir--indonesia.html
-
-Dataset ini berisi rata-rata harga beras di tingkat perdagangan besar atau grosir secara nasional.
+Dataset berisi rata-rata harga beras pada tingkat perdagangan besar/grosir secara nasional.
 
 Data yang tersedia saat ini:
 
@@ -76,100 +57,57 @@ Data yang tersedia saat ini:
 | Juli 2026 | 14.783 |
 | Agustus 2026 | 14.901 |
 
-Data September–Desember 2026 belum tersedia pada dataset saat ini.
+Granularitas data:
 
-Menurut metadata BPS, indikator harga grosir merupakan rata-rata harga beras per kilogram pada tingkat pedagang besar dan disajikan pada level nasional.
+```text
+Nasional × Bulan
+```
+
+Dataset ini digunakan terutama sebagai **benchmark harga tingkat grosir nasional**.
 
 ---
 
-## Ruang Lingkup Analisis
+## 2. 🦆 Bebek Provinsi PIHPS — Harga Beras Provinsi
 
-Karena dataset harga per provinsi saat ini tersedia hingga Juni 2026, periode utama yang digunakan untuk membandingkan kedua dataset adalah:
+**Sumber:** Pusat Informasi Harga Pangan Strategis Nasional (PIHPS), Bank Indonesia.
+
+Dataset:
+
+`Harga_Beras_Indonesia_Jan_Jun_2026.xlsx`
+
+Dataset berisi harga beras berdasarkan:
+
+- provinsi,
+- jenis/kualitas beras,
+- dan bulan.
+
+Periode yang tersedia saat ini:
 
 **Januari–Juni 2026**
 
-Data Juli–Agustus pada dataset grosir tetap dipertahankan dan dapat digunakan untuk analisis tren nasional tambahan.
+Dataset saat ini mencakup:
 
-Beberapa analisis yang direncanakan meliputi:
+- 34 provinsi/wilayah,
+- 132 kombinasi provinsi dan jenis beras,
+- harga dalam rupiah per kilogram,
+- serta beberapa nilai yang tidak tersedia.
 
-1. **Analisis tren harga beras bulanan**
-   - Melihat perubahan harga dari Januari hingga Juni 2026.
-   - Mengidentifikasi periode kenaikan dan penurunan harga.
+Jenis beras:
 
-2. **Perbandingan harga antarprovinsi**
-   - Membandingkan harga rata-rata beras di setiap provinsi.
-   - Mengidentifikasi provinsi dengan harga relatif tinggi dan rendah.
+- Beras Kualitas Bawah 1
+- Beras Kualitas Bawah 2
+- Beras Kualitas Medium 1
+- Beras Kualitas Medium 2
+- Beras Kualitas Super 1
+- Beras Kualitas Super 2
 
-3. **Perbandingan berdasarkan kualitas beras**
-   - Kualitas Bawah
-   - Kualitas Medium
-   - Kualitas Super
+Granularitas:
 
-4. **Analisis perubahan harga**
-   - Perubahan harga bulanan (*month-to-month*).
-   - Persentase kenaikan atau penurunan harga.
+```text
+Provinsi × Jenis Beras × Bulan
+```
 
-5. **Analisis volatilitas harga**
-   - Mengukur seberapa besar perubahan harga pada setiap provinsi dan jenis beras selama periode penelitian.
-
-6. **Perbandingan harga daerah dengan harga grosir nasional**
-   - Membandingkan harga beras pada tingkat provinsi dengan rata-rata harga grosir nasional.
-   - Mengamati kemungkinan selisih atau *price gap* antara kedua kelompok data.
-
-7. **Analisis distribusi harga**
-   - Melihat variasi harga antarprovinsi.
-   - Mengidentifikasi wilayah dengan harga yang jauh berbeda dari distribusi nasional.
-
-8. **Ranking harga beras antarprovinsi**
-   - Provinsi dengan rata-rata harga tertinggi.
-   - Provinsi dengan rata-rata harga terendah.
-   - Ranking berdasarkan masing-masing kualitas beras.
-
----
-
-## Pertanyaan Analisis
-
-Project ini diharapkan dapat menjawab beberapa pertanyaan berikut:
-
-- Bagaimana perkembangan harga beras selama tahun 2026?
-- Apakah harga beras menunjukkan kecenderungan meningkat atau menurun?
-- Provinsi mana yang memiliki harga beras paling tinggi dan paling rendah?
-- Seberapa besar perbedaan harga beras antarprovinsi?
-- Bagaimana perbedaan harga antara beras kualitas bawah, medium, dan super?
-- Jenis beras mana yang mengalami perubahan harga paling besar?
-- Provinsi mana yang memiliki harga beras paling stabil?
-- Apakah terdapat pola regional dalam harga beras Indonesia?
-- Bagaimana harga beras di tingkat daerah dibandingkan dengan harga grosir nasional?
-- Seberapa besar selisih harga antara harga grosir nasional dengan harga yang terpantau di tingkat provinsi?
-
----
-
-## Tahapan Project
-
-Alur pengembangan project direncanakan sebagai berikut:
-
-`Data Collection` → `Data Cleaning` → `Data Transformation` → `Exploratory Data Analysis` → `Visualization` → `Dashboard / Web Application`
-
-### 1. Data Collection
-
-Mengumpulkan data harga beras dari sumber yang digunakan dalam project.
-
-### 2. Data Cleaning
-
-Proses yang dilakukan antara lain:
-
-- pengecekan data kosong,
-- penyamaan nama provinsi,
-- penyamaan kategori jenis beras,
-- pengecekan tipe data,
-- pengecekan duplikasi,
-- dan pengecekan konsistensi satuan harga.
-
-### 3. Data Transformation
-
-Dataset akan diubah apabila diperlukan dari format *wide* menjadi format *long/tidy* agar lebih mudah digunakan dalam analisis dan visualisasi.
-
-Contoh struktur data:
+Contoh:
 
 | Provinsi | Jenis Beras | Bulan | Harga |
 |---|---|---|---:|
@@ -177,136 +115,786 @@ Contoh struktur data:
 | Aceh | Beras Kualitas Medium 1 | Februari 2026 | 14650 |
 | Aceh | Beras Kualitas Medium 1 | Maret 2026 | 14450 |
 
-### 4. Exploratory Data Analysis
+---
 
-Analisis eksploratif dilakukan untuk memperoleh gambaran mengenai:
+## 3. 🦆 Bebek Pasar SP2KP — Harga Beras Tingkat Pasar
 
-- tren harga,
-- distribusi harga,
-- perbedaan antarprovinsi,
-- perbedaan antarjenis beras,
-- perubahan bulanan,
-- volatilitas,
-- serta perbandingan dengan harga grosir nasional.
+**Sumber:** Sistem Pemantauan Pasar dan Kebutuhan Pokok (SP2KP), Kementerian Perdagangan.
 
-### 5. Data Visualization
+Dataset ini akan ditambahkan pada tahap selanjutnya.
 
-Beberapa visualisasi yang dapat dikembangkan antara lain:
+Data yang direncanakan mencakup harga beras berdasarkan:
 
-- line chart perkembangan harga bulanan,
-- bar chart perbandingan harga antarprovinsi,
-- heatmap harga provinsi dan bulan,
-- boxplot distribusi harga,
-- ranking provinsi,
-- peta Indonesia berdasarkan tingkat harga beras,
-- dan grafik perbandingan harga provinsi dengan harga grosir nasional.
+```text
+Provinsi
+   ↓
+Kabupaten/Kota
+   ↓
+Pasar
+   ↓
+Jenis Beras
+   ↓
+Bulan
+   ↓
+Harga
+```
 
-### 6. Dashboard / Web Application
+Granularitas utama yang akan digunakan:
 
-Tahap akhir project direncanakan berupa visualisasi interaktif atau aplikasi berbasis web.
+```text
+Pasar × Kabupaten/Kota × Provinsi × Jenis Beras × Bulan
+```
 
-Fitur yang dapat dikembangkan antara lain:
+Contoh struktur yang diharapkan:
 
-- filter provinsi,
-- filter jenis beras,
-- filter periode,
-- grafik tren harga,
-- perbandingan antarprovinsi,
-- perbandingan antarjenis beras,
-- indikator perubahan harga,
-- ranking provinsi,
-- dan visualisasi peta Indonesia.
+| Provinsi | Kabupaten/Kota | Pasar | Jenis Beras | Bulan | Harga |
+|---|---|---|---|---|---:|
+| Jawa Timur | Surabaya | Pasar A | Medium | Januari 2026 | ... |
+| Jawa Timur | Surabaya | Pasar A | Medium | Februari 2026 | ... |
+| Jawa Timur | Surabaya | Pasar B | Medium | Januari 2026 | ... |
 
-Platform dan framework yang digunakan akan ditentukan pada tahap pengembangan selanjutnya.
+Dataset ini memungkinkan analisis yang lebih detail dibandingkan dua sumber lainnya karena pengguna dapat melakukan **drill-down hingga tingkat pasar**.
+
+> Catatan: apabila dataset SP2KP yang digunakan dalam project merupakan hasil agregasi bulanan, maka perubahan yang dianalisis adalah perubahan antarbulan. Analisis kenaikan atau penurunan harga harian memerlukan data SP2KP pada granularitas harian.
 
 ---
 
-## Struktur Repository
+# 🔗 Integrasi Tiga Sumber Data
 
-Struktur repository akan dikembangkan secara bertahap. Contoh struktur yang direncanakan:
+Ketiga dataset memiliki tingkat granularitas berbeda:
+
+| Sumber | Level Wilayah | Waktu | Detail |
+|---|---|---|---|
+| BPS Grosir | Nasional | Bulanan | Harga grosir |
+| PIHPS | Provinsi | Bulanan | Jenis/kualitas beras |
+| SP2KP | Pasar / Kab/Kota / Provinsi | Bulanan | Harga pasar dan jenis beras |
+
+Karena granularitas dan metodologi sumber data berbeda, data tidak langsung dianggap sebagai harga yang identik.
+
+Integrasi digunakan untuk menghasilkan **perbandingan dan indikator selisih harga**, bukan untuk mengasumsikan bahwa perbedaan harga otomatis merupakan keuntungan atau margin pelaku perdagangan.
+
+Contoh:
 
 ```text
-.
-├── data/
-│   ├── Harga_Beras_Indonesia_Jan_Jun_2026.xlsx
-│   └── Rata-rata Harga Beras di Tingkat Perdagangan Besar (Grosir) Indonesia, 2026.xlsx
+Harga Grosir Nasional
+        ↓
+     Rp14.500
+
+Harga Provinsi
+        ↓
+     Rp15.300
+
+Harga Pasar
+        ↓
+     Rp15.800
+```
+
+Dari data tersebut dapat dihitung:
+
+```text
+Gap Provinsi – Grosir
+Gap Pasar – Provinsi
+Gap Pasar – Grosir
+```
+
+Kemudian perubahan gap dapat diamati dari bulan ke bulan.
+
+---
+
+# 🏗️ Arsitektur Data Warehousing
+
+Project mengikuti arsitektur:
+
+```text
+                 DATA SOURCES
+                       │
+        ┌──────────────┼──────────────┐
+        │              │              │
+        ▼              ▼              ▼
+    BPS Grosir     PIHPS Provinsi   SP2KP Pasar
+        │              │              │
+        ▼              ▼              ▼
+ bebek_grosir     bebek_pihps     bebek_sp2kp
+   .duckdb           .duckdb         .duckdb
+        │              │              │
+        └──────────────┼──────────────┘
+                       │
+                 ETL / ELT
+                       │
+                       ▼
+                 DUCKLAKE
+                       │
+          shared_catalog.ducklake
+                       +
+              lakehouse_storage/
+                       │
+        ┌──────────────┼──────────────┐
+        │              │              │
+      grosir          pihps          sp2kp
+        │              │              │
+        └──────────────┼──────────────┘
+                       │
+                       ▼
+                ANALYTICS MART
+                       │
+                       ▼
+            SQL AGGREGATION & KPI
+                       │
+                       ▼
+               STREAMLIT DASHBOARD
+```
+
+---
+
+# 🗄️ Local DuckDB
+
+Setiap sumber data memiliki database DuckDB tersendiri.
+
+Rencana database:
+
+```text
+bebek_grosir.duckdb
+bebek_pihps.duckdb
+bebek_sp2kp.duckdb
+```
+
+Fungsi local DuckDB adalah sebagai **raw/staging layer** sebelum data terintegrasi ke DuckLake.
+
+Contoh:
+
+```text
+BPS Excel
+   ↓
+bebek_grosir.duckdb
+   ↓
+cleaning / transformation
+   ↓
+DuckLake
+```
+
+---
+
+# 🦆 DuckLake
+
+Data yang telah diproses kemudian diintegrasikan ke satu environment DuckLake.
+
+Rencana struktur:
+
+```text
+DuckLake
 │
-├── notebooks/
-│   └── analysis.ipynb
+├── grosir
+│   └── harga_nasional_bulanan
+│
+├── pihps
+│   └── harga_provinsi_bulanan
+│
+├── sp2kp
+│   └── harga_pasar_bulanan
+│
+└── analytics
+    ├── harga_bulanan
+    ├── province_summary
+    ├── market_summary
+    ├── price_gap
+    └── volatility_summary
+```
+
+DuckLake menggunakan:
+
+```text
+shared_catalog.ducklake
+```
+
+sebagai catalog/metadata dan:
+
+```text
+lakehouse_storage/
+```
+
+sebagai lokasi penyimpanan data fisik.
+
+---
+
+# 🔄 ETL / ELT Process
+
+## 1. Extract
+
+Mengambil data dari ketiga sumber:
+
+```text
+BPS
+PIHPS
+SP2KP
+```
+
+Data sumber dipertahankan dalam bentuk raw agar data asli tetap dapat ditelusuri.
+
+---
+
+## 2. Transform
+
+Transformasi yang direncanakan antara lain:
+
+- mengubah format wide menjadi long/tidy,
+- mengubah kolom harga menjadi numerik,
+- standardisasi format tanggal,
+- membuat kolom tahun dan bulan,
+- standardisasi nama provinsi,
+- standardisasi nama kabupaten/kota,
+- standardisasi nama pasar,
+- standardisasi kategori beras,
+- standardisasi satuan menjadi Rp/kg,
+- pengecekan missing value,
+- pengecekan duplikasi,
+- validasi harga,
+- menambahkan informasi sumber data,
+- dan menyesuaikan granularitas data.
+
+Contoh transformasi PIHPS:
+
+```text
+SEBELUM
+
+Provinsi | Jenis | Jan | Feb | Mar | Apr
+Aceh     | Medium| ... | ... | ... | ...
+
+
+SESUDAH
+
+Provinsi | Jenis | Bulan | Harga
+Aceh     | Medium| Jan   | ...
+Aceh     | Medium| Feb   | ...
+Aceh     | Medium| Mar   | ...
+```
+
+---
+
+## 3. Load
+
+Data hasil transformasi dimuat ke DuckLake sesuai schema masing-masing:
+
+```text
+BPS   → grosir.harga_nasional_bulanan
+
+PIHPS → pihps.harga_provinsi_bulanan
+
+SP2KP → sp2kp.harga_pasar_bulanan
+```
+
+---
+
+# 📊 Proses Agregasi
+
+Data detail akan diagregasi menggunakan SQL agar dapat menghasilkan informasi yang dibutuhkan dashboard.
+
+Contoh:
+
+### Rata-rata harga per provinsi
+
+```sql
+SELECT
+    provinsi,
+    bulan,
+    AVG(harga) AS rata_rata_harga
+FROM pihps.harga_provinsi_bulanan
+GROUP BY provinsi, bulan;
+```
+
+### Median harga
+
+Median digunakan untuk melihat **harga tengah** sehingga hasil tidak terlalu dipengaruhi harga yang sangat tinggi atau rendah.
+
+```text
+Median Harga Provinsi
+```
+
+akan menjadi salah satu indikator utama.
+
+### Harga pasar per kabupaten/kota
+
+```text
+Provinsi
+   ↓
+Kabupaten/Kota
+   ↓
+Pasar
+   ↓
+AVG / MEDIAN / MIN / MAX Harga
+```
+
+---
+
+# 📈 Arah Analisis
+
+## 1. Tren Harga Bulanan
+
+Melihat bagaimana harga beras berubah dari satu bulan ke bulan berikutnya.
+
+Output:
+
+- grafik bulanan,
+- nilai perubahan harga,
+- persentase perubahan harga,
+- tren naik/turun.
+
+Contoh:
+
+```text
+Jan → Rp14.500
+Feb → Rp14.800
+Mar → Rp14.600
+Apr → Rp15.100
+```
+
+---
+
+## 2. Perubahan Month-to-Month
+
+Menghitung:
+
+```text
+Perubahan Harga
+= Harga Bulan Sekarang - Harga Bulan Sebelumnya
+```
+
+dan:
+
+```text
+MoM (%)
+=
+(Harga Sekarang - Harga Sebelumnya)
+─────────────────────────────────── × 100%
+        Harga Sebelumnya
+```
+
+---
+
+## 3. Harga Tengah Provinsi
+
+Untuk setiap provinsi dapat dihitung:
+
+- mean,
+- median,
+- minimum,
+- maksimum.
+
+Median digunakan untuk menjawab pertanyaan seperti:
+
+> “Harga tengah beras di Jawa Timur bulan ini berapa?”
+
+---
+
+## 4. Fluktuasi Harga
+
+Fluktuasi dapat dianalisis menggunakan:
+
+- range harga,
+- standard deviation,
+- perubahan bulanan,
+- persentase perubahan,
+- nilai tertinggi,
+- nilai terendah.
+
+Tujuannya untuk mengetahui daerah atau pasar dengan harga yang relatif:
+
+```text
+stabil
+vs
+fluktuatif
+```
+
+---
+
+## 5. Perbandingan Antarprovinsi
+
+Analisis meliputi:
+
+- provinsi dengan harga tertinggi,
+- provinsi dengan harga terendah,
+- median harga provinsi,
+- perbedaan harga antarprovinsi,
+- perbandingan berdasarkan jenis beras.
+
+---
+
+## 6. Drill-down Provinsi → Kabupaten/Kota → Pasar
+
+Dataset SP2KP akan memungkinkan pengguna melakukan eksplorasi:
+
+```text
+Jawa Timur
+    ↓
+Surabaya
+    ↓
+Pasar tertentu
+    ↓
+Jenis beras
+    ↓
+Grafik bulanan
+```
+
+Setelah pasar dipilih, dashboard dapat menampilkan:
+
+```text
+Harga saat ini
+Harga bulan sebelumnya
+Perubahan Rp
+Perubahan %
+Harga tertinggi
+Harga terendah
+Rata-rata
+Median
+Fluktuasi
+```
+
+---
+
+## 7. Perbandingan Antarlevel Harga
+
+Analisis dapat membandingkan:
+
+```text
+BPS Grosir Nasional
+        vs
+PIHPS Provinsi
+        vs
+SP2KP Pasar
+```
+
+Indikator yang dapat dihitung:
+
+```text
+Gap Pasar vs Provinsi
+
+Gap Provinsi vs Grosir
+
+Gap Pasar vs Grosir
+```
+
+Perbandingan dilakukan dengan memperhatikan bahwa masing-masing dataset memiliki metodologi dan granularitas yang berbeda.
+
+---
+
+# 🖥️ Dashboard Streamlit
+
+Dashboard akan dikembangkan menggunakan **Streamlit**.
+
+## Halaman 1 — National Overview
+
+Menampilkan:
+
+- harga grosir nasional,
+- rata-rata harga provinsi,
+- median harga provinsi,
+- tren harga nasional,
+- perubahan harga bulanan,
+- provinsi harga tertinggi,
+- provinsi harga terendah.
+
+---
+
+## Halaman 2 — Province Analysis
+
+Filter:
+
+```text
+Provinsi
+Jenis Beras
+Periode
+```
+
+Visualisasi:
+
+- grafik harga bulanan,
+- rata-rata harga,
+- median harga,
+- perubahan MoM,
+- ranking provinsi,
+- volatilitas harga.
+
+---
+
+## Halaman 3 — Market Explorer
+
+Filter bertingkat:
+
+```text
+Provinsi
+   ↓
+Kabupaten/Kota
+   ↓
+Pasar
+   ↓
+Jenis Beras
+```
+
+Output:
+
+- harga per bulan,
+- perubahan harga,
+- rata-rata harga,
+- median,
+- harga minimum,
+- harga maksimum,
+- indikator fluktuasi.
+
+---
+
+## Halaman 4 — Price Comparison
+
+Membandingkan:
+
+```text
+Grosir
+vs
+Provinsi
+vs
+Pasar
+```
+
+Visualisasi:
+
+- multi-line chart,
+- price gap,
+- perubahan gap bulanan,
+- tabel perbandingan.
+
+---
+
+# 🧭 Contoh User Flow Dashboard
+
+Misalnya pengguna ingin mengetahui kondisi harga beras di Surabaya.
+
+Pengguna memilih:
+
+```text
+Provinsi        : Jawa Timur
+Kabupaten/Kota  : Surabaya
+Pasar           : Pasar Wonokromo
+Jenis Beras     : Medium
+```
+
+Jika data tersebut tersedia, dashboard dapat memberikan:
+
+```text
+Harga bulan terakhir      Rp ...
+Harga bulan sebelumnya    Rp ...
+
+Perubahan                 +Rp ...
+Perubahan (%)             +...%
+
+Harga rata-rata           Rp ...
+Harga median              Rp ...
+
+Harga tertinggi           Rp ...
+Harga terendah            Rp ...
+
+Fluktuasi                 ...
+```
+
+Kemudian:
+
+```text
+          GRAFIK HARGA BULANAN
+
+Harga
+  │
+  │             ●
+  │       ●           ●
+  │   ●
+  │
+  └────────────────────────── Bulan
+      Jan Feb Mar Apr Mei ...
+```
+
+Di bawahnya dapat ditampilkan perbandingan dengan:
+
+```text
+Rata-rata Jawa Timur
+Rata-rata nasional/grosir
+```
+
+---
+
+# 📁 Rencana Struktur Repository
+
+```text
+bebekberazz/
+│
+├── data/
+│   ├── raw/
+│   │   ├── grosir/
+│   │   ├── pihps/
+│   │   └── sp2kp/
+│   │
+│   └── processed/
+│
+├── databases/
+│   ├── bebek_grosir.duckdb
+│   ├── bebek_pihps.duckdb
+│   ├── bebek_sp2kp.duckdb
+│   └── shared_catalog.ducklake
+│
+├── lakehouse_storage/
 │
 ├── src/
-│   └── data_processing.py
-│
-├── visualizations/
-│   └── ...
+│   ├── ingest.py
+│   ├── transform.py
+│   └── analytics.py
 │
 ├── app/
-│   └── ...
+│   └── dashboard.py
 │
 ├── README.md
 └── requirements.txt
 ```
 
-Struktur folder dapat berubah sesuai kebutuhan project.
+Struktur dapat berubah selama proses implementasi.
 
 ---
 
-## Tools dan Teknologi
+# ⚙️ Alur Menjalankan Project
 
-Beberapa teknologi yang direncanakan untuk digunakan:
+Secara umum project akan dijalankan dengan urutan:
+
+```text
+1. INGEST DATA
+        ↓
+2. CREATE LOCAL DUCKDB
+        ↓
+3. CLEAN & TRANSFORM
+        ↓
+4. LOAD TO DUCKLAKE
+        ↓
+5. BUILD ANALYTICAL TABLES
+        ↓
+6. RUN STREAMLIT DASHBOARD
+```
+
+Secara teknis nantinya kurang lebih:
+
+```bash
+python src/ingest.py
+```
+
+kemudian:
+
+```bash
+python src/transform.py
+```
+
+dan setelah proses data selesai:
+
+```bash
+streamlit run app/dashboard.py
+```
+
+---
+
+# 🛠️ Tools dan Teknologi
+
+Project direncanakan menggunakan:
 
 - **Python**
-- **Pandas** — pengolahan dan transformasi data
-- **NumPy** — perhitungan numerik
-- **Matplotlib / Seaborn / Plotly** — visualisasi data
-- **Jupyter Notebook** — eksplorasi dan analisis data
-
-Untuk tahap dashboard atau aplikasi web, teknologi akan ditentukan kemudian. Beberapa alternatif yang dapat dipertimbangkan antara lain:
-
-- Streamlit
-- Plotly Dash
-- Flask
-- atau framework visualisasi/web lainnya
+- **DuckDB** — local database dan SQL processing
+- **DuckLake** — integrated lakehouse/catalog
+- **Pandas** — cleaning dan transformasi
+- **SQL** — integrasi, agregasi, dan analytical query
+- **Streamlit** — dashboard interaktif
+- **Plotly** — visualisasi interaktif
+- **Git / GitHub** — version control dan repository
 
 ---
 
-## Catatan Data
+# ⚠️ Catatan Data
 
-Beberapa hal yang perlu diperhatikan dalam penggunaan dataset:
+Beberapa hal yang perlu diperhatikan:
 
-- Tidak semua provinsi memiliki seluruh kategori beras.
-- Terdapat beberapa nilai kosong pada dataset provinsi.
-- Nilai kosong tidak langsung diubah menjadi nol karena nilai nol memiliki interpretasi yang berbeda dengan data yang tidak tersedia.
-- Dataset harga provinsi saat ini tersedia sampai Juni 2026.
-- Dataset harga grosir nasional saat ini tersedia sampai Agustus 2026.
-- Perbandingan langsung antara kedua dataset perlu memperhatikan **level observasi dan metodologi pengumpulan data yang berbeda**.
-- Harga grosir nasional tidak dapat dianggap sama dengan harga pada tingkat pasar/konsumen di setiap provinsi.
+- Tidak semua provinsi memiliki seluruh jenis beras.
+- Missing value tidak otomatis diubah menjadi nol.
+- Nama provinsi, kabupaten/kota, dan pasar perlu distandardisasi sebelum integrasi.
+- Klasifikasi jenis beras antar sumber mungkin berbeda dan membutuhkan mapping.
+- BPS, PIHPS, dan SP2KP memiliki granularitas serta metode pengumpulan yang berbeda.
+- Harga grosir tidak dapat langsung dianggap sama dengan harga pasar.
+- Selisih harga antar sumber disebut sebagai **price gap**, bukan otomatis sebagai margin keuntungan.
+- Analisis harian hanya dapat dilakukan apabila data harian tersedia.
+- Perbandingan lintas sumber hanya dilakukan pada periode dan kategori yang dapat disejajarkan.
 
 ---
 
-## Status Project
+# 🚧 Status Project
 
 **Work in Progress**
 
-Tahapan saat ini:
+### Data
 
-- [x] Pengumpulan dataset harga beras
-- [x] Penggabungan data harga berdasarkan provinsi
-- [x] Standardisasi awal struktur dataset
-- [x] Penambahan dataset harga grosir nasional
-- [ ] Data cleaning lanjutan
-- [ ] Transformasi data ke format analisis
-- [ ] Exploratory Data Analysis (EDA)
-- [ ] Analisis perbandingan harga
-- [ ] Visualisasi data
-- [ ] Penentuan konsep dashboard/web
-- [ ] Pengembangan dashboard/web
-- [ ] Deployment
+- [x] Dataset harga beras provinsi PIHPS
+- [x] Dataset harga grosir nasional BPS
+- [ ] Dataset harga pasar SP2KP
+- [x] Standardisasi awal dataset PIHPS
+- [ ] Standardisasi seluruh sumber data
+
+### Data Warehousing
+
+- [ ] Membuat `bebek_grosir.duckdb`
+- [ ] Membuat `bebek_pihps.duckdb`
+- [ ] Membuat `bebek_sp2kp.duckdb`
+- [ ] Implementasi ETL
+- [ ] Implementasi DuckLake
+- [ ] Membuat analytical/data mart tables
+
+### Analytics
+
+- [ ] Analisis tren harga
+- [ ] Analisis perubahan bulanan
+- [ ] Analisis median harga
+- [ ] Analisis volatilitas
+- [ ] Analisis antarprovinsi
+- [ ] Analisis kabupaten/kota dan pasar
+- [ ] Analisis price gap
+- [ ] Validasi perbandingan antar sumber
+
+### Dashboard
+
+- [ ] National Overview
+- [ ] Province Analysis
+- [ ] Market Explorer
+- [ ] Price Comparison
+- [ ] Deployment Streamlit
 
 ---
 
-## Tujuan Akhir
+# 🎯 Expected Output
 
-Project ini diharapkan dapat menghasilkan sebuah sistem analisis dan visualisasi yang memudahkan pengguna dalam memahami **perkembangan, perbedaan, dan pola harga beras di Indonesia berdasarkan wilayah, kualitas beras, serta tingkat perdagangan**.
+Output akhir project berupa sebuah **data warehouse dan dashboard analitik harga beras Indonesia** yang dapat digunakan untuk mengeksplorasi perkembangan harga dari tingkat nasional hingga pasar.
 
-Project masih dalam tahap pengembangan dan akan diperbarui seiring penambahan data, analisis, serta fitur visualisasi.
+Sistem diharapkan memungkinkan pengguna melakukan analisis:
+
+```text
+NASIONAL
+   ↓
+PROVINSI
+   ↓
+KABUPATEN / KOTA
+   ↓
+PASAR
+   ↓
+JENIS BERAS
+   ↓
+PERIODE
+```
+
+dan menghasilkan informasi mengenai:
+
+```text
+Harga
+Tren
+Perubahan
+Median
+Fluktuasi
+Perbandingan wilayah
+Price gap
+```
+
+Dengan demikian, **BebekBerazz** tidak hanya berfungsi sebagai project visualisasi data, tetapi sebagai implementasi proses **Data Ingestion → ETL → Data Warehouse/Lakehouse → Analytics → Interactive Dashboard** menggunakan DuckDB, DuckLake, dan Streamlit.
