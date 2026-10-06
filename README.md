@@ -153,10 +153,6 @@ Contoh struktur yang diharapkan:
 | Jawa Timur | Surabaya | Pasar A | Medium | Februari 2026 | ... |
 | Jawa Timur | Surabaya | Pasar B | Medium | Januari 2026 | ... |
 
-Dataset ini memungkinkan analisis yang lebih detail dibandingkan dua sumber lainnya karena pengguna dapat melakukan **drill-down hingga tingkat pasar**.
-
-> Catatan: apabila dataset SP2KP yang digunakan dalam project merupakan hasil agregasi bulanan, maka perubahan yang dianalisis adalah perubahan antarbulan. Analisis kenaikan atau penurunan harga harian memerlukan data SP2KP pada granularitas harian.
-
 ---
 
 # 🔗 Integrasi Tiga Sumber Data
@@ -662,61 +658,6 @@ Visualisasi:
 
 ---
 
-# 🧭 Contoh User Flow Dashboard
-
-Misalnya pengguna ingin mengetahui kondisi harga beras di Surabaya.
-
-Pengguna memilih:
-
-```text
-Provinsi        : Jawa Timur
-Kabupaten/Kota  : Surabaya
-Pasar           : Pasar Wonokromo
-Jenis Beras     : Medium
-```
-
-Jika data tersebut tersedia, dashboard dapat memberikan:
-
-```text
-Harga bulan terakhir      Rp ...
-Harga bulan sebelumnya    Rp ...
-
-Perubahan                 +Rp ...
-Perubahan (%)             +...%
-
-Harga rata-rata           Rp ...
-Harga median              Rp ...
-
-Harga tertinggi           Rp ...
-Harga terendah            Rp ...
-
-Fluktuasi                 ...
-```
-
-Kemudian:
-
-```text
-          GRAFIK HARGA BULANAN
-
-Harga
-  │
-  │             ●
-  │       ●           ●
-  │   ●
-  │
-  └────────────────────────── Bulan
-      Jan Feb Mar Apr Mei ...
-```
-
-Di bawahnya dapat ditampilkan perbandingan dengan:
-
-```text
-Rata-rata Jawa Timur
-Rata-rata nasional/grosir
-```
-
----
-
 # 📁 Rencana Struktur Repository
 
 ```text
@@ -782,6 +723,7 @@ kemudian:
 
 ```bash
 python src/transform.py
+python src/analytic.py
 ```
 
 dan setelah proses data selesai:
@@ -831,15 +773,14 @@ Beberapa hal yang perlu diperhatikan:
 
 - [x] Dataset harga beras provinsi PIHPS
 - [x] Dataset harga grosir nasional BPS
-- [ ] Dataset harga pasar SP2KP
-- [x] Standardisasi awal dataset PIHPS
+- [x] Dataset harga pasar SP2KP
 - [ ] Standardisasi seluruh sumber data
 
 ### Data Warehousing
 
-- [ ] Membuat `bebek_grosir.duckdb`
-- [ ] Membuat `bebek_pihps.duckdb`
-- [ ] Membuat `bebek_sp2kp.duckdb`
+- [x] Membuat `bebek_grosir.duckdb`
+- [x] Membuat `bebek_pihps.duckdb`
+- [x] Membuat `bebek_sp2kp.duckdb`
 - [ ] Implementasi ETL
 - [ ] Implementasi DuckLake
 - [ ] Membuat analytical/data mart tables
@@ -863,38 +804,3 @@ Beberapa hal yang perlu diperhatikan:
 - [ ] Price Comparison
 - [ ] Deployment Streamlit
 
----
-
-# 🎯 Expected Output
-
-Output akhir project berupa sebuah **data warehouse dan dashboard analitik harga beras Indonesia** yang dapat digunakan untuk mengeksplorasi perkembangan harga dari tingkat nasional hingga pasar.
-
-Sistem diharapkan memungkinkan pengguna melakukan analisis:
-
-```text
-NASIONAL
-   ↓
-PROVINSI
-   ↓
-KABUPATEN / KOTA
-   ↓
-PASAR
-   ↓
-JENIS BERAS
-   ↓
-PERIODE
-```
-
-dan menghasilkan informasi mengenai:
-
-```text
-Harga
-Tren
-Perubahan
-Median
-Fluktuasi
-Perbandingan wilayah
-Price gap
-```
-
-Dengan demikian, **BebekBerazz** tidak hanya berfungsi sebagai project visualisasi data, tetapi sebagai implementasi proses **Data Ingestion → ETL → Data Warehouse/Lakehouse → Analytics → Interactive Dashboard** menggunakan DuckDB, DuckLake, dan Streamlit.
