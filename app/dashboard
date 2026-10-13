@@ -1,30 +1,15 @@
 import os
-
 import base64
-
 from pathlib import Path
-
-
-
 import duckdb
-
 import streamlit as st
-
 import pandas as pd
-
 import plotly.express as px
 
 
-
-
-
 # =========================================================
-
 # 1. KONFIGURASI DASHBOARD
-
 # =========================================================
-
-
 
 st.set_page_config(
 
@@ -39,28 +24,16 @@ st.set_page_config(
 
 
 DATABASE_DIR = "databases"
-
 LAKEHOUSE_DIR = "lakehouse_storage"
-
 CATALOG_PATH = f"{DATABASE_DIR}/shared_catalog.ducklake"
-
 BACKGROUND_PATH = Path("assets/background.jpg")
 
 
-
-
-
 # =========================================================
-
 # 2. BACKGROUND DAN STYLE
-
 # =========================================================
-
-
 
 def set_background(image_path):
-    """Pasang background gambar dengan overlay krem soft agar tampilan lebih hangat."""
-    image_css = ""
     if Path(image_path).exists():
         with open(image_path, "rb") as image_file:
             encoded = base64.b64encode(image_file.read()).decode("utf-8")
@@ -200,16 +173,9 @@ def set_background(image_path):
 set_background(BACKGROUND_PATH)
 
 
-
-
-
 # =========================================================
-
 # 3. KONEKSI DUCKLAKE
-
 # =========================================================
-
-
 
 @st.cache_resource
 
@@ -239,17 +205,9 @@ def get_connection():
 
     return con
 
-
-
-
-
 # =========================================================
-
 # 4. MEMUAT DATA ANALYTICAL MART
-
 # =========================================================
-
-
 
 @st.cache_data(ttl=300)
 
@@ -351,12 +309,6 @@ def load_data():
 
     return province, market, national, gap, volatility
 
-
-
-
-
-# Jika koneksi atau nama tabel salah, tampilkan pesan yang lebih mudah dipahami.
-
 try:
 
     province_df, market_df, national_df, gap_df, volatility_df = load_data()
@@ -377,16 +329,9 @@ except Exception as error:
 
 
 
-
-
 # =========================================================
-
 # 5. FUNGSI BANTUAN
-
 # =========================================================
-
-
-
 def rupiah(value):
 
     if pd.isna(value):
@@ -394,8 +339,6 @@ def rupiah(value):
         return "—"
 
     return "Rp" + f"{value:,.0f}".replace(",", ".")
-
-
 
 
 
@@ -408,15 +351,9 @@ def month_name(date_value):
     return pd.to_datetime(date_value).strftime("%b %Y")
 
 
-
-
-
 def show_empty():
 
     st.info("Tidak ada data yang sesuai dengan filter yang dipilih.")
-
-
-
 
 
 def format_date_column(df, column="tanggal"):
@@ -432,9 +369,6 @@ def format_date_column(df, column="tanggal"):
         ).dt.strftime("%B %Y")
 
     return result
-
-
-
 
 
 def style_chart(fig):
@@ -463,19 +397,10 @@ def style_chart(fig):
 
 
 # =========================================================
-
 # 6. HEADER
-
 # =========================================================
-
-
-
 st.title("🌾 BebekBerazz")
-
 st.subheader("Indonesian Rice Price Data Warehouse & Analytics")
-
-
-
 st.markdown(
 
     """
@@ -495,17 +420,9 @@ st.markdown(
 st.divider()
 
 
-
-
-
 # =========================================================
-
 # 7. SIDEBAR NAVIGASI
-
 # =========================================================
-
-
-
 st.sidebar.title("🌾 BebekBerazz")
 
 st.sidebar.caption("Rice Price Analytics")
@@ -539,16 +456,9 @@ st.sidebar.caption("Data warehouse: DuckDB + DuckLake")
 st.sidebar.caption("Periode data: 2026")
 
 
-
-
-
 # =========================================================
-
 # MENU 1: NATIONAL OVERVIEW
-
 # =========================================================
-
-
 
 if menu == "National Overview":
 
@@ -721,12 +631,8 @@ if menu == "National Overview":
 
 
 # =========================================================
-
 # MENU 2: PROVINCE ANALYSIS
-
 # =========================================================
-
-
 
 elif menu == "Province Analysis":
 
@@ -1241,13 +1147,8 @@ elif menu == "Market Explorer":
 
 
 # =========================================================
-
 # MENU 4: PRICE COMPARISON
-
 # =========================================================
-
-
-
 elif menu == "Price Comparison":
 
     st.header("Price Comparison")
@@ -1535,13 +1436,8 @@ elif menu == "Price Comparison":
 
 
 # =========================================================
-
 # FOOTER
-
 # =========================================================
-
-
-
 st.divider()
 
 st.caption(
