@@ -71,7 +71,7 @@ Dataset ini digunakan terutama sebagai **benchmark harga tingkat grosir nasional
 ## 2. 🦆 Bebek Provinsi PIHPS — Harga Beras Provinsi
 
 **Sumber:** Pusat Informasi Harga Pangan Strategis Nasional (PIHPS), Bank Indonesia.
-**link:** [https://www.bi.go.id/hargapangan/TabelHarga/ProdusenKomoditas](https://www.bi.go.id/hargapangan/TabelHarga/ProdusenDaerah)
+**link:** [https://www.bi.go.id/hargapangan/TabelHarga/ProdusenDaerah](https://www.bi.go.id/hargapangan/TabelHarga/ProdusenDaerah)
 
 Dataset:
 
