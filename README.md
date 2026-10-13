@@ -37,6 +37,7 @@ Analisis diarahkan untuk menjawab pertanyaan seperti:
 ## 1. 🦆 Bebek Grosir — Harga Beras Grosir Nasional
 
 **Sumber:** Badan Pusat Statistik (BPS)
+**link:** https://www.bps.go.id/id/statistics-table/2/Mjk1IzI=/rata-rata-harga-beras-di-tingkat-perdagangan-besar--grosir--indonesia.html 
 
 Dataset:
 
@@ -70,6 +71,7 @@ Dataset ini digunakan terutama sebagai **benchmark harga tingkat grosir nasional
 ## 2. 🦆 Bebek Provinsi PIHPS — Harga Beras Provinsi
 
 **Sumber:** Pusat Informasi Harga Pangan Strategis Nasional (PIHPS), Bank Indonesia.
+**link:** https://www.bi.go.id/hargapangan/TabelHarga/ProdusenKomoditas
 
 Dataset:
 
@@ -120,6 +122,7 @@ Contoh:
 ## 3. 🦆 Bebek Pasar SP2KP — Harga Beras Tingkat Pasar
 
 **Sumber:** Sistem Pemantauan Pasar dan Kebutuhan Pokok (SP2KP), Kementerian Perdagangan.
+**link:** 
 
 Dataset ini akan ditambahkan pada tahap selanjutnya.
 
