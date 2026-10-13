@@ -1,1447 +1,567 @@
-import os
-import base64
-from pathlib import Path
-import duckdb
 import streamlit as st
+import duckdb
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+import os
+import glob
+import base64
 
-
-# =========================================================
-# 1. KONFIGURASI DASHBOARD
-# =========================================================
-
+# -----------------------------------------------------------------------------
+# 1. KONFIGURASI HALAMAN
+# -----------------------------------------------------------------------------
 st.set_page_config(
-
-    page_title="BebekBerazz | Rice Price Analytics",
-
-    page_icon="🌾",
-
+    page_title="BebekBerazz Analytics",
+    page_icon="🦆",
     layout="wide",
-
+    initial_sidebar_state="expanded",
 )
 
-
-
-DATABASE_DIR = "databases"
-LAKEHOUSE_DIR = "lakehouse_storage"
-CATALOG_PATH = f"{DATABASE_DIR}/shared_catalog.ducklake"
-BACKGROUND_PATH = Path("assets/background.jpg")
-
-
-# =========================================================
-# 2. BACKGROUND DAN STYLE
-# =========================================================
-
-def set_background(image_path):
-    if Path(image_path).exists():
-        with open(image_path, "rb") as image_file:
-            encoded = base64.b64encode(image_file.read()).decode("utf-8")
-        image_css = f"""
-            background-image:
-                linear-gradient(
-                    rgba(248, 243, 234, 0.86),
-                    rgba(248, 243, 234, 0.86)
-                ),
-                url("data:image/jpeg;base64,{encoded}");
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-        """
-    else:
-        st.warning(
-            "Background belum ditemukan. Pastikan gambar tersimpan di "
-            "assets/background.jpg pada folder utama project."
-        )
-        image_css = "background: #F8F3EA;"
-
-    st.markdown(
-        f"""
-        <style>
-        :root {{
-            --cream: #F8F3EA;
-            --card: #FFFCF7;
-            --beige: #E9DDCB;
-            --beige-border: #E5D7C5;
-            --coffee: #594638;
-            --terracotta: #B98764;
-            --muted: #8B7968;
-        }}
-
-        .stApp {{
-            {image_css}
-            color: var(--coffee);
-        }}
-
-        .main .block-container {{
-            padding-top: 2rem;
-            padding-bottom: 2.5rem;
-            max-width: 1500px;
-        }}
-
-        h1, h2, h3, p, label, [data-testid="stCaptionContainer"] {{
-            color: var(--coffee);
-        }}
-
-        h1, h2, h3 {{
-            font-weight: 700;
-        }}
-
-        [data-testid="stSidebar"] {{
-            background: rgba(233, 221, 203, 0.97);
-            border-right: 1px solid var(--beige-border);
-        }}
-
-        [data-testid="stSidebar"] * {{
-            color: var(--coffee);
-        }}
-
-        [data-testid="stMetric"] {{
-            background: rgba(255, 252, 247, 0.96);
-            border: 1px solid rgba(185, 135, 100, 0.30);
-            border-radius: 16px;
-            padding: 20px 22px;
-            box-shadow: 0 5px 16px rgba(89, 70, 56, 0.08);
-            min-height: 125px;
-        }}
-
-        [data-testid="stMetricLabel"] {{
-            color: var(--muted);
-            font-size: 0.9rem;
-            font-weight: 600;
-        }}
-
-        [data-testid="stMetricValue"] {{
-            color: var(--coffee);
-            font-weight: 750;
-        }}
-
-        [data-testid="stMetricDelta"] {{
-            color: var(--terracotta);
-        }}
-
-        div[data-testid="stDataFrame"] {{
-            background: rgba(255, 252, 247, 0.97);
-            border: 1px solid var(--beige-border);
-            border-radius: 14px;
-            padding: 7px;
-            overflow: hidden;
-        }}
-
-        div[data-testid="stPlotlyChart"] {{
-            background: rgba(255, 252, 247, 0.94);
-            border: 1px solid rgba(229, 215, 197, 0.9);
-            border-radius: 16px;
-            padding: 10px 10px 2px 10px;
-            box-shadow: 0 4px 14px rgba(89, 70, 56, 0.05);
-        }}
-
-        div[data-baseweb="select"] > div,
-        div[data-baseweb="input"] > div {{
-            background-color: #FFFCF7;
-            border-color: #D8C5AF;
-            border-radius: 10px;
-        }}
-
-        div.stButton > button {{
-            background: var(--coffee);
-            color: #FFFCF7;
-            border: 1px solid var(--coffee);
-            border-radius: 10px;
-        }}
-
-        div.stButton > button:hover {{
-            background: var(--terracotta);
-            color: white;
-            border-color: var(--terracotta);
-        }}
-
-        hr {{
-            border-color: rgba(185, 135, 100, 0.28);
-        }}
-
-        [data-testid="stAlert"] {{
-            border-radius: 12px;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-set_background(BACKGROUND_PATH)
-
-
-# =========================================================
-# 3. KONEKSI DUCKLAKE
-# =========================================================
-
-@st.cache_resource
-
-def get_connection():
-
-    con = duckdb.connect()
-
-    con.execute("INSTALL ducklake;")
-
-    con.execute("LOAD ducklake;")
-
-
-
-    con.execute(
-
-        f"""
-
-        ATTACH 'ducklake:{CATALOG_PATH}'
-
-        AS lake
-
-        (DATA_PATH '{LAKEHOUSE_DIR}/');
-
-        """
-
-    )
-
-    return con
-
-# =========================================================
-# 4. MEMUAT DATA ANALYTICAL MART
-# =========================================================
-
-@st.cache_data(ttl=300)
-
-def load_data():
-
-    con = get_connection()
-
-
-
-    province = con.execute(
-
-        """
-
-        SELECT *
-
-        FROM lake.analytics.province_summary
-
-        """
-
-    ).df()
-
-
-
-    market = con.execute(
-
-        """
-
-        SELECT *
-
-        FROM lake.analytics.market_summary
-
-        """
-
-    ).df()
-
-
-
-    national = con.execute(
-
-        """
-
-        SELECT *
-
-        FROM lake.analytics.national_trend
-
-        ORDER BY tanggal
-
-        """
-
-    ).df()
-
-
-
-    gap = con.execute(
-
-        """
-
-        SELECT *
-
-        FROM lake.analytics.price_gap
-
-        """
-
-    ).df()
-
-
-
-    volatility = con.execute(
-
-        """
-
-        SELECT *
-
-        FROM lake.analytics.volatility_summary
-
-        """
-
-    ).df()
-
-
-
-    for df in [province, market, national, gap]:
-
-        if "tanggal" in df.columns:
-
-            df["tanggal"] = pd.to_datetime(df["tanggal"], errors="coerce")
-
-
-
-    if "tanggal" in volatility.columns:
-
-        volatility["tanggal"] = pd.to_datetime(
-
-            volatility["tanggal"], errors="coerce"
-
-        )
-
-
-
-    return province, market, national, gap, volatility
-
-try:
-
-    province_df, market_df, national_df, gap_df, volatility_df = load_data()
-
-except Exception as error:
-
-    st.error(
-
-        "Dashboard belum berhasil membaca data dari DuckLake. "
-
-        "Pastikan pipeline load, ducklake, dan analytic sudah dijalankan."
-
-    )
-
-    st.code(str(error))
-
-    st.stop()
-
-
-
-# =========================================================
-# 5. FUNGSI BANTUAN
-# =========================================================
-def rupiah(value):
-
-    if pd.isna(value):
-
-        return "—"
-
-    return "Rp" + f"{value:,.0f}".replace(",", ".")
-
-
-
-def month_name(date_value):
-
-    if pd.isna(date_value):
-
-        return "—"
-
-    return pd.to_datetime(date_value).strftime("%b %Y")
-
-
-def show_empty():
-
-    st.info("Tidak ada data yang sesuai dengan filter yang dipilih.")
-
-
-def format_date_column(df, column="tanggal"):
-
-    result = df.copy()
-
-    if column in result.columns:
-
-        result[column] = pd.to_datetime(
-
-            result[column], errors="coerce"
-
-        ).dt.strftime("%B %Y")
-
-    return result
-
-
-def style_chart(fig):
+CATALOG_PATH = "databases/shared_catalog.ducklake"
+COLOR_PALETTE = ['#F6C445', '#4299E1', '#F56565', '#48BB78', '#9F7AEA', '#ED8936']
+
+# ---- Pengaturan kartu sidebar (silakan diubah) ------------------------------
+TEAM_NAME = "by calon pahlawan"          # tulisan kecil di kartu
+IMG_PATTERN = "assets/padi.*"            # lokasi gambar padi
+OVERLAY_A = 0.72                         # 0 = gambar jelas, 1 = tertutup warna kuning
+CARD_GRADIENT = "linear-gradient(135deg, #FFE08A 0%, #F6C445 45%, #D69E2E 100%)"
+
+# -----------------------------------------------------------------------------
+# 2. CSS GLOBAL
+# -----------------------------------------------------------------------------
+st.markdown("""
+<style>
+    .stApp { background-color: #0E1117; }
+    .block-container { padding-top: 3.5rem; max-width: 1300px; }
+    .main-title { font-size: 2.2rem; font-weight: 800; color: #F6C445; margin-bottom: 0; line-height: 1.3; }
+    .sub-title { font-size: 0.95rem; color: #A0AAB8; margin-bottom: 20px; }
+
+    .metric-card {
+        background: linear-gradient(135deg, #1E232A 0%, #161A1E 100%);
+        border: 1px solid #2D3748;
+        border-left: 4px solid #F6C445;
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 4px 10px rgba(0,0,0,.35);
+        height: 100%;
+        min-height: 118px;
+    }
+    .metric-label { font-size: .75rem; color: #A0AAB8; font-weight: 600;
+                    text-transform: uppercase; letter-spacing: .05em; }
+    .metric-value { font-size: 1.7rem; font-weight: 700; color: #FFF; margin-top: 4px; }
+    .metric-value.small { font-size: 1.15rem; line-height: 1.5; padding: 4px 0; }
+    .metric-sub   { font-size: .8rem; margin-top: 2px; }
+    .up   { color: #FC8181; }
+    .down { color: #68D391; }
+    .flat { color: #A0AAB8; }
+
+    .insight-box {
+        background: #1A202C; border: 1px dashed #F6C445; border-radius: 10px;
+        padding: 12px 16px; color: #E2E8F0; font-size: .92rem; margin: 10px 0 18px 0;
+    }
+    .section-note { color: #A0AAB8; font-size: .85rem; margin: -6px 0 10px 0; }
+
+    /* ---------- SIDEBAR ---------- */
+    [data-testid="stSidebar"] { background-color: #12161C; border-right: 1px solid #1F2630; }
+
+    .nav-label {
+        font-size: .72rem; color: #718096; font-weight: 600;
+        margin: 18px 0 4px 8px; letter-spacing: .04em;
+    }
+
+    /* Tombol menu (tidak aktif) */
+    [data-testid="stSidebar"] .stButton > button {
+        justify-content: flex-start;
+        background: transparent;
+        border: 1px solid transparent;
+        color: #CBD5E0;
+        border-radius: 10px;
+        padding: .55rem .8rem;
+        font-weight: 600;
+        transition: all .15s ease;
+    }
+    [data-testid="stSidebar"] .stButton > button:hover {
+        background: rgba(246,196,69,.10);
+        border-color: rgba(246,196,69,.25);
+        color: #F6C445;
+    }
+    /* Tombol menu AKTIF (type="primary") */
+    [data-testid="stSidebar"] .stButton > button[kind="primary"],
+    [data-testid="stSidebar"] .stButton > button[data-testid="stBaseButton-primary"] {
+        background: rgba(246,196,69,.16);
+        border: 1px solid rgba(246,196,69,.45);
+        color: #F6C445;
+    }
+
+    /* Kartu bawah sidebar */
+    .side-card {
+        position: relative; overflow: hidden;
+        border-radius: 18px; padding: 16px;
+        color: #2B1D00;
+        box-shadow: 0 6px 18px rgba(0,0,0,.35);
+    }
+    .side-card .top { display: flex; align-items: center; gap: 10px; }
+    .side-card .circle {
+        width: 42px; height: 42px; border-radius: 50%;
+        border: 1.5px solid rgba(43,29,0,.45);
+        background: rgba(255,255,255,.35);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 20px; flex-shrink: 0;
+    }
+    .side-card .by   { font-size: .68rem; font-weight: 600; opacity: .85; line-height: 1.1; }
+    .side-card .name { font-size: 1.15rem; font-weight: 800; line-height: 1.2; }
+    .side-card .desc { font-size: .78rem; margin: 10px 0 12px 0; line-height: 1.35; font-weight: 500; }
+    .side-card .pill {
+        background: #FFFFFF; color: #2B1D00; border-radius: 999px;
+        text-align: center; padding: 8px 10px; font-weight: 700; font-size: .78rem;
+    }
+    .side-card.mini { padding: 8px; display: flex; justify-content: center; }
+    .side-card.mini .circle { width: 38px; height: 38px; }
+</style>
+""", unsafe_allow_html=True)
+
+# -----------------------------------------------------------------------------
+# 3. HELPER DATA & GRAFIK
+# -----------------------------------------------------------------------------
+@st.cache_data(ttl=600, show_spinner="Memuat data...")
+def load_data(query: str) -> pd.DataFrame:
+    if not os.path.exists(CATALOG_PATH) or os.path.getsize(CATALOG_PATH) == 0:
+        raise FileNotFoundError("Catalog belum siap. Jalankan `python src/transform.py` dulu.")
+    conn = duckdb.connect(CATALOG_PATH, read_only=True)
+    try:
+        if os.path.exists("databases/bebek_grosir.duckdb"):
+            conn.execute("ATTACH IF NOT EXISTS 'databases/bebek_grosir.duckdb' AS db_grosir;")
+        return conn.execute(query).df()
+    finally:
+        conn.close()
+
+
+def safe_load(query: str) -> pd.DataFrame:
+    try:
+        return load_data(query)
+    except Exception as e:
+        st.error(f"⚠️ Gagal membaca data: {e}")
+        st.stop()
+
+
+def style_fig(fig, height=400, legend_bottom=True):
     fig.update_layout(
-        template="plotly_white",
-        paper_bgcolor="rgba(255,252,247,0.0)",
-        plot_bgcolor="rgba(255,252,247,0.0)",
-        font=dict(color="#594638", family="Arial, sans-serif"),
-        margin=dict(l=20, r=20, t=50, b=20),
-        legend_title_text="",
-        colorway=["#B98764", "#8B6950", "#D8BFA5", "#A87855", "#6F5848"],
+        template="plotly_dark", height=height,
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#E2E8F0"),
+        margin=dict(l=10, r=10, t=50, b=10),
+        hovermode="x unified",
+        title=dict(x=0, font=dict(size=16)),
     )
-    fig.update_xaxes(
-        showgrid=False,
-        zeroline=False,
-        linecolor="#DCCBB8",
-        tickfont=dict(color="#594638"),
-    )
-    fig.update_yaxes(
-        gridcolor="#E9DDCB",
-        zeroline=False,
-        linecolor="#DCCBB8",
-        tickfont=dict(color="#594638"),
-    )
+    if legend_bottom:
+        fig.update_layout(legend=dict(orientation="h", y=-0.2, x=0, title=None))
+    fig.update_xaxes(showgrid=False)
+    fig.update_yaxes(gridcolor="#2D3748", tickformat=",")
     return fig
 
 
-# =========================================================
-# 6. HEADER
-# =========================================================
-st.title("🌾 BebekBerazz")
-st.subheader("Indonesian Rice Price Data Warehouse & Analytics")
-st.markdown(
-
-    """
-
-    Dashboard analitik harga beras yang mengintegrasikan data
-
-    **Grosir Nasional, PIHPS, dan SP2KP** ke dalam lakehouse
-
-    menggunakan DuckDB dan DuckLake.
-
-    """
-
-)
+def rp(x):
+    return f"Rp {x:,.0f}"
 
 
-
-st.divider()
-
-
-# =========================================================
-# 7. SIDEBAR NAVIGASI
-# =========================================================
-st.sidebar.title("🌾 BebekBerazz")
-
-st.sidebar.caption("Rice Price Analytics")
-
-
-
-menu = st.sidebar.radio(
-
-    "Pilih Menu",
-
-    [
-
-        "National Overview",
-
-        "Province Analysis",
-
-        "Market Explorer",
-
-        "Price Comparison",
-
-    ],
-
-)
-
-
-
-st.sidebar.divider()
-
-st.sidebar.caption("Data warehouse: DuckDB + DuckLake")
-
-st.sidebar.caption("Periode data: 2026")
-
-
-# =========================================================
-# MENU 1: NATIONAL OVERVIEW
-# =========================================================
-
-if menu == "National Overview":
-
-    st.header("National Overview")
-
-    st.caption("Ringkasan perkembangan harga beras grosir nasional.")
-
-
-
-    national = national_df.sort_values("tanggal").copy()
-
-
-
-    if national.empty:
-
-        show_empty()
-
+def kpi(label, value, delta=None, note="", small=False):
+    """Kartu KPI. small=True untuk nilai berupa teks panjang (nama provinsi)."""
+    if delta is None:
+        sub = f'<span class="flat">{note}</span>'
     else:
-
-        latest = national.iloc[-1]
-
-        perubahan = latest.get("perubahan_persen", None)
-
-
-
-        col1, col2, col3, col4 = st.columns(4)
-
-
-
-        col1.metric(
-
-            "Harga Grosir Terbaru",
-
-            rupiah(latest.get("harga_grosir")),
-
-            month_name(latest.get("tanggal")),
-
-        )
-
-        col2.metric(
-
-            "Perubahan Bulanan",
-
-            f"{perubahan:.2f}%" if pd.notna(perubahan) else "—",
-
-        )
-
-        col3.metric(
-
-            "Harga Tertinggi",
-
-            rupiah(national["harga_grosir"].max()),
-
-        )
-
-        col4.metric(
-
-            "Harga Terendah",
-
-            rupiah(national["harga_grosir"].min()),
-
-        )
-
-
-
-        st.divider()
-
-        st.subheader("Tren Harga Beras Grosir Nasional")
-
-
-
-        fig = px.line(
-
-            national,
-
-            x="tanggal",
-
-            y="harga_grosir",
-
-            markers=True,
-
-            text="harga_grosir",
-
-            labels={
-
-                "tanggal": "Bulan",
-
-                "harga_grosir": "Harga Grosir (Rp)",
-
-            },
-
-        )
-
-        fig.update_traces(
-
-            line=dict(color="#B98764", width=3),
-
-            marker=dict(size=8, color="#8B6950"),
-
-            texttemplate="%{y:,.0f}",
-
-            textposition="top center",
-
-        )
-
-        fig.update_yaxes(tickformat=",.0f")
-
-        st.plotly_chart(style_chart(fig), use_container_width=True)
-
-
-
-        st.subheader("Perubahan Harga Bulanan")
-
-
-
-        columns = [
-
-            "tanggal",
-
-            "harga_grosir",
-
-            "harga_bulan_sebelumnya",
-
-            "perubahan_harga",
-
-            "perubahan_persen",
-
-        ]
-
-        available_columns = [
-
-            column for column in columns if column in national.columns
-
-        ]
-
-        trend_display = format_date_column(national[available_columns])
-
-
-
-        trend_display = trend_display.rename(
-
-            columns={
-
-                "tanggal": "Bulan",
-
-                "harga_grosir": "Harga Grosir",
-
-                "harga_bulan_sebelumnya": "Harga Bulan Sebelumnya",
-
-                "perubahan_harga": "Perubahan Harga",
-
-                "perubahan_persen": "Perubahan (%)",
-
-            }
-
-        )
-
-        st.dataframe(
-
-            trend_display,
-
-            use_container_width=True,
-
-            hide_index=True,
-
-        )
-
-
-
-
-
-# =========================================================
-# MENU 2: PROVINCE ANALYSIS
-# =========================================================
-
-elif menu == "Province Analysis":
-
-    st.header("Province Analysis")
-
-    st.caption("Analisis statistik harga beras berdasarkan provinsi.")
-
-
-
-    province = province_df.copy()
-
-
-
-    if province.empty:
-
-        show_empty()
-
+        cls = "up" if delta > 0.05 else "down" if delta < -0.05 else "flat"
+        arrow = "▲" if delta > 0.05 else "▼" if delta < -0.05 else "■"
+        sub = f'<span class="{cls}">{arrow} {abs(delta):.1f}% vs bulan lalu</span>'
+    size_cls = "metric-value small" if small else "metric-value"
+    st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">{label}</div>
+            <div class="{size_cls}">{value}</div>
+            <div class="metric-sub">{sub}</div>
+        </div>""", unsafe_allow_html=True)
+
+
+def insight(text):
+    st.markdown(f'<div class="insight-box">💡 {text}</div>', unsafe_allow_html=True)
+
+
+def pct_change(series):
+    if len(series) < 2 or series.iloc[-2] == 0:
+        return None
+    return (series.iloc[-1] - series.iloc[-2]) / series.iloc[-2] * 100
+
+
+def month_order(df):
+    return (df.drop_duplicates('bulan_num')
+              .sort_values('bulan_num')['bulan_nama'].tolist())
+
+
+@st.cache_data
+def load_card_image(pattern: str) -> str:
+    """Baca gambar padi -> data URI (base64). Kosong kalau file tidak ada."""
+    files = sorted(glob.glob(pattern))
+    if not files:
+        return ""
+    path = files[0]
+    ext = os.path.splitext(path)[1].lower().strip(".")
+    mime = {"jpg": "jpeg", "jpeg": "jpeg", "png": "png", "webp": "webp"}.get(ext)
+    if mime is None:
+        return ""
+    with open(path, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode()
+    return f"data:image/{mime};base64,{b64}"
+
+
+def card_background() -> str:
+    img = load_card_image(IMG_PATTERN)
+    if img:
+        overlay = (f"linear-gradient(135deg, rgba(255,224,138,{OVERLAY_A}), "
+                   f"rgba(214,158,46,{min(OVERLAY_A + .1, 1)}))")
+        return f"{overlay}, url('{img}') center/cover no-repeat"
+    return CARD_GRADIENT
+
+# -----------------------------------------------------------------------------
+# 4. SIDEBAR (NAVIGASI + MODE CIUT + KARTU)
+# -----------------------------------------------------------------------------
+PAGES = [
+    ("home",   "Ringkasan Nasional", ":material/dashboard:"),
+    ("prov",   "Analisis Provinsi",  ":material/map:"),
+    ("market", "Jelajah Pasar",      ":material/storefront:"),
+    ("gap",    "Selisih Harga",      ":material/compare_arrows:"),
+]
+
+if "page" not in st.session_state:
+    st.session_state.page = "home"
+if "compact" not in st.session_state:
+    st.session_state.compact = False
+
+
+# CATATAN: jangan beri nama fungsi "go" -> bentrok dengan plotly.graph_objects as go
+def set_page(key):
+    st.session_state.page = key
+
+
+def toggle_compact():
+    st.session_state.compact = not st.session_state.compact
+
+
+compact = st.session_state.compact
+
+# Mode ciut: sidebar jadi sempit, hanya ikon yang terlihat
+if compact:
+    st.markdown("""
+    <style>
+        [data-testid="stSidebar"] {
+            width: 84px !important; min-width: 84px !important; max-width: 84px !important;
+        }
+        [data-testid="stSidebar"] .stButton > button { justify-content: center; padding: .55rem .4rem; }
+        [data-testid="stSidebar"] .stButton > button [data-testid="stMarkdownContainer"] { display: none; }
+        [data-testid="stSidebar"] .stButton > button span { margin: 0 !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
+with st.sidebar:
+    # --- Header + tombol ciut/lebar ---
+    if compact:
+        st.image("https://img.icons8.com/emoji/96/duck-emoji.png", width=40)
+        st.button("", icon=":material/chevron_right:", key="toggle",
+                  on_click=toggle_compact, help="Lebarkan sidebar", use_container_width=True)
     else:
+        h1, h2 = st.columns([5, 1])
+        with h1:
+            st.image("https://img.icons8.com/emoji/96/duck-emoji.png", width=56)
+            st.markdown("### BebekBerazz")
+            st.caption("Data Warehouse & Rice Price Intelligence")
+        with h2:
+            st.button("", icon=":material/chevron_left:", key="toggle",
+                      on_click=toggle_compact, help="Ciutkan sidebar")
 
-        provinces = sorted(province["provinsi"].dropna().unique().tolist())
-
-
-
-        if not provinces:
-
-            show_empty()
-
-            st.stop()
-
-
-
-        selected_province = st.selectbox("Pilih Provinsi", provinces)
-
-        province = province[province["provinsi"] == selected_province].copy()
-
-
-
-        rice_types = sorted(
-
-            province["jenis_beras"].dropna().unique().tolist()
-
+    # --- Menu ---
+    if not compact:
+        st.markdown('<div class="nav-label">Menu</div>', unsafe_allow_html=True)
+    for key, label, icon in PAGES:
+        st.button(
+            label, icon=icon, key=f"nav_{key}",
+            on_click=set_page, args=(key,),
+            type="primary" if st.session_state.page == key else "secondary",
+            use_container_width=True, help=label,
         )
 
-
-
-        if not rice_types:
-
-            show_empty()
-
-            st.stop()
-
-
-
-        selected_type = st.selectbox("Pilih Jenis Beras", rice_types)
-
-        province = province[
-
-            province["jenis_beras"] == selected_type
-
-        ].sort_values("tanggal")
-
-
-
-        if province.empty:
-
-            show_empty()
-
-        else:
-
-            latest = province.iloc[-1]
-
-            col1, col2, col3, col4 = st.columns(4)
-
-
-
-            col1.metric(
-
-                "Rata-rata Harga Terbaru",
-
-                rupiah(latest.get("rata_rata_harga")),
-
-            )
-
-            col2.metric(
-
-                "Median Harga",
-
-                rupiah(latest.get("median_harga")),
-
-            )
-
-            col3.metric(
-
-                "Harga Minimum",
-
-                rupiah(latest.get("min_harga")),
-
-            )
-
-            col4.metric(
-
-                "Harga Maksimum",
-
-                rupiah(latest.get("max_harga")),
-
-            )
-
-
-
-            st.divider()
-
-            st.subheader(f"Tren Harga — {selected_province}")
-
-
-
-            fig = px.line(
-
-                province,
-
-                x="tanggal",
-
-                y="rata_rata_harga",
-
-                markers=True,
-
-                labels={
-
-                    "tanggal": "Bulan",
-
-                    "rata_rata_harga": "Rata-rata Harga (Rp)",
-
-                },
-
-            )
-
-            fig.update_traces(
-
-                line=dict(color="#B98764", width=3),
-
-                marker=dict(size=7, color="#8B6950"),
-
-            )
-
-            fig.update_yaxes(tickformat=",.0f")
-
-            st.plotly_chart(style_chart(fig), use_container_width=True)
-
-
-
-            st.subheader("Statistik Harga Bulanan")
-
-
-
-            columns = [
-
-                "tanggal",
-
-                "rata_rata_harga",
-
-                "median_harga",
-
-                "min_harga",
-
-                "max_harga",
-
-                "jumlah_harga_valid",
-
-            ]
-
-            available_columns = [
-
-                column for column in columns if column in province.columns
-
-            ]
-
-            display = format_date_column(province[available_columns])
-
-            display = display.rename(
-
-                columns={
-
-                    "tanggal": "Bulan",
-
-                    "rata_rata_harga": "Rata-rata Harga",
-
-                    "median_harga": "Median Harga",
-
-                    "min_harga": "Harga Minimum",
-
-                    "max_harga": "Harga Maksimum",
-
-                    "jumlah_harga_valid": "Jumlah Harga Valid",
-
-                }
-
-            )
-
-            st.dataframe(display, use_container_width=True, hide_index=True)
-
-
-
-    st.divider()
-
-    st.subheader("Volatilitas Harga Antarprovinsi")
-
-
-
-    vol = volatility_df.copy()
-
-    if vol.empty:
-
-        show_empty()
-
+    # --- Sumber data ---
+    if not compact:
+        st.markdown('<div class="nav-label">Sumber data</div>', unsafe_allow_html=True)
+        st.markdown(
+            "<div style='color:#A0AAB8;font-size:.85rem;line-height:1.7;margin-left:8px'>"
+            "🏭 <b>BPS</b> → harga grosir<br>"
+            "🏬 <b>PIHPS</b> → harga provinsi<br>"
+            "🛒 <b>SP2KP</b> → harga pasar</div>",
+            unsafe_allow_html=True,
+        )
+
+    # --- Spacer + kartu gradien ---
+    st.markdown("<div style='height:60px'></div>", unsafe_allow_html=True)
+    bg = card_background()
+    if compact:
+        st.markdown(
+            f'<div class="side-card mini" style="background:{bg}">'
+            f'<div class="circle">🌾</div></div>',
+            unsafe_allow_html=True,
+        )
     else:
+        st.markdown(f"""
+        <div class="side-card" style="background:{bg}">
+            <div class="top">
+                <div class="circle">🌾</div>
+                <div>
+                    <div class="by">{TEAM_NAME}</div>
+                    <div class="name">BebekBerazz</div>
+                </div>
+            </div>
+            <div class="desc">Pantau harga beras dari grosir sampai pasar, dalam satu dashboard.</div>
+            <div class="pill">BPS · PIHPS · SP2KP</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-        vol_types = sorted(
+menu = st.session_state.page
 
-            vol["jenis_beras"].dropna().unique().tolist()
+# -----------------------------------------------------------------------------
+# 5. HEADER HALAMAN
+# -----------------------------------------------------------------------------
+st.markdown('<p class="main-title">🦆 BebekBerazz Analytics</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-title">Pemantauan harga beras Indonesia dari tingkat grosir hingga pasar</p>',
+            unsafe_allow_html=True)
 
-        )
+# -----------------------------------------------------------------------------
+# HALAMAN 1: RINGKASAN NASIONAL
+# -----------------------------------------------------------------------------
+if menu == "home":
+    st.subheader("🏠 Ringkasan Nasional")
 
-        if vol_types:
+    try:
+        df_grosir = load_data("SELECT * FROM db_grosir.harga_nasional_bulanan ORDER BY bulan_num")
+    except Exception:
+        df_grosir = pd.DataFrame(columns=['bulan_num', 'bulan_nama', 'harga'])
+    df_prov = safe_load("SELECT * FROM province_summary")
 
-            selected_vol_type = st.selectbox(
+    ritel_bulan = (df_prov.groupby(['bulan_num', 'bulan_nama'])['avg_harga']
+                   .mean().reset_index().sort_values('bulan_num'))
 
-                "Jenis Beras untuk Analisis Volatilitas",
+    last_m = df_prov['bulan_num'].max()
+    last_prov = (df_prov[df_prov['bulan_num'] == last_m]
+                 .groupby('provinsi')['avg_harga'].mean().sort_values(ascending=False))
 
-                vol_types,
+    grosir_last = df_grosir['harga'].iloc[-1] if not df_grosir.empty else 0
+    ritel_last = ritel_bulan['avg_harga'].iloc[-1]
+    gap_last = ritel_last - grosir_last if grosir_last else None
 
-            )
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        kpi("Grosir Nasional (terbaru)", rp(grosir_last),
+            pct_change(df_grosir['harga']) if not df_grosir.empty else None)
+    with c2:
+        kpi("Rata-rata Ritel Provinsi", rp(ritel_last), pct_change(ritel_bulan['avg_harga']))
+    with c3:
+        kpi("Selisih Ritel − Grosir",
+            rp(gap_last) if gap_last is not None else "-",
+            note="Margin rantai distribusi")
+    with c4:
+        kpi("Provinsi Termahal", last_prov.index[0],
+            note=f"{rp(last_prov.iloc[0])}/kg", small=True)
 
-            vol = vol[vol["jenis_beras"] == selected_vol_type].copy()
+    if len(ritel_bulan) >= 2:
+        first, last = ritel_bulan['avg_harga'].iloc[0], ritel_bulan['avg_harga'].iloc[-1]
+        arah = "naik" if last > first else "turun"
+        insight(f"Sejak <b>{ritel_bulan['bulan_nama'].iloc[0]}</b> hingga "
+                f"<b>{ritel_bulan['bulan_nama'].iloc[-1]}</b>, harga ritel rata-rata <b>{arah} "
+                f"{abs(last-first)/first*100:.1f}%</b>. Provinsi termurah saat ini: "
+                f"<b>{last_prov.index[-1]}</b> ({rp(last_prov.iloc[-1])}/kg).")
 
-            vol = vol.sort_values(
+    st.markdown("<br>", unsafe_allow_html=True)
+    col_l, col_r = st.columns([3, 2])
 
-                "standar_deviasi_harga", ascending=False
+    with col_l:
+        fig = go.Figure()
+        if not df_grosir.empty:
+            fig.add_trace(go.Scatter(x=df_grosir['bulan_nama'], y=df_grosir['harga'],
+                                     name="Grosir (BPS)", mode="lines+markers",
+                                     line=dict(color="#F6C445", width=3),
+                                     fill="tozeroy", fillcolor="rgba(246,196,69,.08)"))
+        fig.add_trace(go.Scatter(x=ritel_bulan['bulan_nama'], y=ritel_bulan['avg_harga'],
+                                 name="Ritel Provinsi (PIHPS)", mode="lines+markers",
+                                 line=dict(color="#4299E1", width=3)))
+        fig.update_layout(title="Tren Harga: Grosir vs Ritel (Rp/kg)")
+        ys = list(ritel_bulan['avg_harga']) + list(df_grosir['harga'])
+        fig.update_yaxes(range=[min(ys) * 0.97, max(ys) * 1.03])
+        st.plotly_chart(style_fig(fig, 400), use_container_width=True)
 
-            )
+    with col_r:
+        top5 = last_prov.head(5).reset_index().sort_values('avg_harga')
+        bot5 = last_prov.tail(5).reset_index().sort_values('avg_harga', ascending=False)
+        tab_a, tab_b = st.tabs(["🔺 Termahal", "🔻 Termurah"])
+        for tab, d, color in [(tab_a, top5, "#F56565"), (tab_b, bot5, "#48BB78")]:
+            with tab:
+                f = px.bar(d, x='avg_harga', y='provinsi', orientation='h',
+                           text=d['avg_harga'].map(lambda v: f"{v:,.0f}"))
+                f.update_traces(marker_color=color, textposition="inside")
+                f.update_layout(xaxis_title="Rp/kg", yaxis_title=None)
+                f.update_xaxes(range=[d['avg_harga'].min() * 0.9, d['avg_harga'].max() * 1.02])
+                st.plotly_chart(style_fig(f, 340, False), use_container_width=True)
 
+# -----------------------------------------------------------------------------
+# HALAMAN 2: ANALISIS PROVINSI
+# -----------------------------------------------------------------------------
+elif menu == "prov":
+    st.subheader("🗺️ Analisis Provinsi")
+    df_prov = safe_load("SELECT * FROM province_summary ORDER BY bulan_num")
 
+    c1, c2 = st.columns([1, 2])
+    with c1:
+        selected_prov = st.selectbox("Pilih Provinsi:", sorted(df_prov['provinsi'].unique()))
+    with c2:
+        all_jenis = sorted(df_prov['jenis_beras'].unique())
+        selected_jenis = st.multiselect("Jenis Beras:", all_jenis, default=all_jenis)
 
-            fig_vol = px.bar(
+    if not selected_jenis:
+        st.warning("Pilih minimal satu jenis beras.")
+        st.stop()
 
-                vol,
+    d = df_prov[(df_prov['provinsi'] == selected_prov) &
+                (df_prov['jenis_beras'].isin(selected_jenis))]
+    nasional = (df_prov[df_prov['jenis_beras'].isin(selected_jenis)]
+                .groupby(['bulan_num', 'bulan_nama'])['avg_harga'].mean()
+                .reset_index().sort_values('bulan_num'))
 
-                x="provinsi",
+    prov_bulan = d.groupby(['bulan_num', 'bulan_nama'])['avg_harga'].mean().reset_index().sort_values('bulan_num')
+    k1, k2, k3 = st.columns(3)
+    with k1:
+        kpi("Harga Terbaru (rata-rata)", rp(prov_bulan['avg_harga'].iloc[-1]),
+            pct_change(prov_bulan['avg_harga']))
+    with k2:
+        selisih = prov_bulan['avg_harga'].iloc[-1] - nasional['avg_harga'].iloc[-1]
+        kpi("vs Rata-rata Nasional", f"{'+' if selisih >= 0 else '−'}{rp(abs(selisih))}",
+            note="lebih mahal dari nasional" if selisih > 0 else "lebih murah dari nasional")
+    with k3:
+        kpi("Rentang Periode", f"{rp(prov_bulan['avg_harga'].min())} – {rp(prov_bulan['avg_harga'].max())}",
+            note="harga terendah – tertinggi", small=True)
 
-                y="standar_deviasi_harga",
+    st.markdown("<br>", unsafe_allow_html=True)
 
-                labels={
+    fig = px.line(d, x='bulan_nama', y='avg_harga', color='jenis_beras', markers=True,
+                  title=f"Perkembangan Harga Beras di {selected_prov}",
+                  labels={'bulan_nama': 'Bulan', 'avg_harga': 'Rp/kg', 'jenis_beras': 'Jenis'},
+                  color_discrete_sequence=COLOR_PALETTE)
+    fig.add_trace(go.Scatter(x=nasional['bulan_nama'], y=nasional['avg_harga'],
+                             name="Rata-rata Nasional", mode="lines",
+                             line=dict(color="#FFFFFF", dash="dash", width=2)))
+    st.plotly_chart(style_fig(fig, 430), use_container_width=True)
 
-                    "provinsi": "Provinsi",
+    st.markdown("##### 🌡️ Peta Panas Harga: Semua Provinsi × Bulan")
+    st.markdown('<p class="section-note">Semakin merah = semakin mahal. Provinsi pilihanmu ditandai ▶</p>',
+                unsafe_allow_html=True)
+    heat = (df_prov[df_prov['jenis_beras'].isin(selected_jenis)]
+            .groupby(['provinsi', 'bulan_num', 'bulan_nama'])['avg_harga'].mean().reset_index())
+    order = month_order(heat)
+    pivot = heat.pivot(index='provinsi', columns='bulan_nama', values='avg_harga')[order]
+    pivot = pivot.sort_values(order[-1], ascending=False)
+    pivot.index = [f"▶ {p}" if p == selected_prov else p for p in pivot.index]
+    fig_h = px.imshow(pivot, aspect="auto", color_continuous_scale="YlOrRd",
+                      labels=dict(color="Rp/kg"))
+    fig_h.update_layout(coloraxis_colorbar=dict(title="Rp/kg"))
+    st.plotly_chart(style_fig(fig_h, max(420, len(pivot) * 18), False), use_container_width=True)
 
-                    "standar_deviasi_harga": "Standar Deviasi Harga (Rp)",
+# -----------------------------------------------------------------------------
+# HALAMAN 3: JELAJAH PASAR
+# -----------------------------------------------------------------------------
+elif menu == "market":
+    st.subheader("🏪 Jelajah Pasar")
+    df_market = safe_load("SELECT * FROM market_summary ORDER BY bulan_num")
 
-                },
+    c1, c2 = st.columns(2)
+    with c1:
+        selected_prov = st.selectbox("Pilih Provinsi:", sorted(df_market['provinsi'].unique()))
+    df_mp = df_market[df_market['provinsi'] == selected_prov]
+    with c2:
+        selected_pasar = st.selectbox("Pilih Pasar:", sorted(df_mp['nama_pasar'].unique()))
 
-            )
+    d = df_mp[df_mp['nama_pasar'] == selected_pasar]
 
-            fig_vol.update_traces(marker_color="#C7A487")
+    last_m = d['bulan_num'].max()
+    latest = d[d['bulan_num'] == last_m].groupby('jenis_beras')['harga'].mean()
+    cols = st.columns(max(len(latest), 1))
+    for col, (jenis, val) in zip(cols, latest.items()):
+        hist = d[d['jenis_beras'] == jenis].sort_values('bulan_num')['harga']
+        with col:
+            kpi(jenis, rp(val), pct_change(hist))
 
-            fig_vol.update_yaxes(tickformat=",.0f")
+    st.markdown("<br>", unsafe_allow_html=True)
 
-            st.plotly_chart(
-
-                style_chart(fig_vol), use_container_width=True
-
-            )
-
-
-
-            st.caption(
-
-                "Semakin tinggi standar deviasi, semakin besar variasi "
-
-                "harga pada data yang dianalisis."
-
-            )
-
-
-
-
-
-# =========================================================
-
-# MENU 3: MARKET EXPLORER
-
-# =========================================================
-
-
-
-elif menu == "Market Explorer":
-
-    st.header("Market Explorer")
-
-    st.caption(
-
-        "Eksplorasi harga berdasarkan pasar, provinsi, dan jenis beras."
-
-    )
-
-
-
-    market = market_df.copy()
-
-
-
-    if market.empty:
-
-        show_empty()
-
+    mode = st.radio("Tampilan grafik:", ["📈 Garis (tren)", "📊 Batang (bandingkan)"], horizontal=True)
+    if mode.startswith("📈"):
+        fig = px.line(d, x='bulan_nama', y='harga', color='jenis_beras', markers=True,
+                      color_discrete_sequence=COLOR_PALETTE)
     else:
-
-        provinces = sorted(market["provinsi"].dropna().unique().tolist())
-
-
-
-        if not provinces:
-
-            show_empty()
-
-            st.stop()
-
-
-
-        selected_province = st.selectbox("Pilih Provinsi", provinces)
-
-        market = market[market["provinsi"] == selected_province].copy()
-
-
-
-        rice_types = sorted(
-
-            market["jenis_beras"].dropna().unique().tolist()
-
-        )
-
-        if not rice_types:
-
-            show_empty()
-
-            st.stop()
-
-
-
-        selected_type = st.selectbox("Pilih Jenis Beras", rice_types)
-
-        market = market[market["jenis_beras"] == selected_type].copy()
-
-
-
-        markets = sorted(
-
-            market["nama_pasar"].dropna().unique().tolist()
-
-        )
-
-        selected_market = st.selectbox(
-
-            "Pilih Pasar", ["Semua Pasar"] + markets
-
-        )
-
-
-
-        if selected_market != "Semua Pasar":
-
-            market = market[market["nama_pasar"] == selected_market].copy()
-
-
-
-        market = market.sort_values("tanggal")
-
-
-
-        if market.empty:
-
-            show_empty()
-
-        else:
-
-            col1, col2, col3 = st.columns(3)
-
-            col1.metric(
-
-                "Rata-rata Harga",
-
-                rupiah(market["rata_rata_harga"].mean()),
-
-            )
-
-            col2.metric(
-
-                "Harga Minimum",
-
-                rupiah(market["min_harga"].min()),
-
-            )
-
-            col3.metric(
-
-                "Harga Maksimum",
-
-                rupiah(market["max_harga"].max()),
-
-            )
-
-
-
-            st.divider()
-
-            st.subheader("Perbandingan Harga Antar Pasar")
-
-
-
-            market_latest = (
-
-                market.sort_values("tanggal")
-
-                .groupby(
-
-                    ["nama_pasar", "jenis_beras"],
-
-                    as_index=False,
-
-                )
-
-                .tail(1)
-
-                .sort_values("rata_rata_harga")
-
-            )
-
-
-
-            fig = px.bar(
-
-                market_latest,
-
-                x="nama_pasar",
-
-                y="rata_rata_harga",
-
-                labels={
-
-                    "nama_pasar": "Nama Pasar",
-
-                    "rata_rata_harga": "Harga Rata-rata (Rp)",
-
-                },
-
-            )
-
-            fig.update_traces(marker_color="#C7A487")
-
-            fig.update_yaxes(tickformat=",.0f")
-
-            st.plotly_chart(style_chart(fig), use_container_width=True)
-
-
-
-            st.subheader("Riwayat Harga Pasar")
-
-
-
-            fig_history = px.line(
-
-                market,
-
-                x="tanggal",
-
-                y="rata_rata_harga",
-
-                color="nama_pasar",
-
-                markers=True,
-
-                labels={
-
-                    "tanggal": "Bulan",
-
-                    "rata_rata_harga": "Harga Rata-rata (Rp)",
-
-                    "nama_pasar": "Pasar",
-
-                },
-
-            )
-
-            fig_history.update_yaxes(tickformat=",.0f")
-
-            st.plotly_chart(
-
-                style_chart(fig_history), use_container_width=True
-
-            )
-
-
-
-            st.subheader("Detail Data Pasar")
-
-            display = format_date_column(
-
-                market.sort_values(["tanggal", "nama_pasar"])
-
-            )
-
-            st.dataframe(display, use_container_width=True, hide_index=True)
-
-
-
-
-
-# =========================================================
-# MENU 4: PRICE COMPARISON
-# =========================================================
-elif menu == "Price Comparison":
-
-    st.header("Price Comparison")
-
-    st.caption(
-
-        "Perbandingan deskriptif harga PIHPS tingkat provinsi "
-
-        "dengan harga grosir nasional."
-
-    )
-
-
-
-    gap = gap_df.copy()
-
-
-
-    if gap.empty:
-
-        show_empty()
-
-    else:
-
-        provinces = sorted(gap["provinsi"].dropna().unique().tolist())
-
-        rice_types = sorted(
-
-            gap["jenis_beras"].dropna().unique().tolist()
-
-        )
-
-
-
-        selected_province = st.selectbox(
-
-            "Pilih Provinsi", ["Semua Provinsi"] + provinces
-
-        )
-
-        selected_type = st.selectbox(
-
-            "Pilih Jenis Beras", ["Semua Jenis"] + rice_types
-
-        )
-
-
-
-        if selected_province != "Semua Provinsi":
-
-            gap = gap[gap["provinsi"] == selected_province].copy()
-
-
-
-        if selected_type != "Semua Jenis":
-
-            gap = gap[gap["jenis_beras"] == selected_type].copy()
-
-
-
-        if gap.empty:
-
-            show_empty()
-
-        else:
-
-            col1, col2, col3 = st.columns(3)
-
-            col1.metric(
-
-                "Rata-rata Harga Provinsi",
-
-                rupiah(gap["rata_rata_harga_provinsi"].mean()),
-
-            )
-
-            col2.metric(
-
-                "Rata-rata Harga Grosir Nasional",
-
-                rupiah(gap["harga_grosir_nasional"].mean()),
-
-            )
-
-            col3.metric(
-
-                "Rata-rata Gap Harga",
-
-                rupiah(gap["gap_provinsi_grosir"].mean()),
-
-            )
-
-
-
-            st.divider()
-
-            st.subheader("Tren Perbandingan Harga")
-
-
-
-            if (
-
-                selected_province != "Semua Provinsi"
-
-                and selected_type != "Semua Jenis"
-
-            ):
-
-                chart_data = gap.sort_values("tanggal")
-
-                fig = px.line(
-
-                    chart_data,
-
-                    x="tanggal",
-
-                    y=[
-
-                        "rata_rata_harga_provinsi",
-
-                        "harga_grosir_nasional",
-
-                    ],
-
-                    markers=True,
-
-                    labels={
-
-                        "tanggal": "Bulan",
-
-                        "value": "Harga (Rp)",
-
-                        "variable": "Sumber Harga",
-
-                        "rata_rata_harga_provinsi": "Harga Provinsi (PIHPS)",
-
-                        "harga_grosir_nasional": "Harga Grosir Nasional",
-
-                    },
-
-                )
-
-                fig.update_yaxes(tickformat=",.0f")
-
-                st.plotly_chart(
-
-                    style_chart(fig), use_container_width=True
-
-                )
-
-            else:
-
-                latest_date = gap["tanggal"].max()
-
-                latest_gap = gap[gap["tanggal"] == latest_date]
-
-
-
-                province_gap = (
-
-                    latest_gap.groupby("provinsi", as_index=False)[
-
-                        "gap_provinsi_grosir"
-
-                    ]
-
-                    .mean()
-
-                    .sort_values("gap_provinsi_grosir")
-
-                )
-
-
-
-                fig = px.bar(
-
-                    province_gap,
-
-                    x="provinsi",
-
-                    y="gap_provinsi_grosir",
-
-                    labels={
-
-                        "provinsi": "Provinsi",
-
-                        "gap_provinsi_grosir": "Gap Harga (Rp)",
-
-                    },
-
-                )
-
-                fig.update_traces(marker_color="#C7A487")
-
-                fig.update_yaxes(tickformat=",.0f")
-
-                st.plotly_chart(
-
-                    style_chart(fig), use_container_width=True
-
-                )
-
-
-
-            st.subheader("Detail Selisih Harga")
-
-
-
-            columns = [
-
-                "tanggal",
-
-                "provinsi",
-
-                "jenis_beras",
-
-                "rata_rata_harga_provinsi",
-
-                "harga_grosir_nasional",
-
-                "gap_provinsi_grosir",
-
-                "gap_persen",
-
-            ]
-
-            available_columns = [
-
-                column for column in columns if column in gap.columns
-
-            ]
-
-            display = format_date_column(
-
-                gap[available_columns].sort_values(
-
-                    ["tanggal", "provinsi", "jenis_beras"]
-
-                )
-
-            )
-
-            display = display.rename(
-
-                columns={
-
-                    "tanggal": "Bulan",
-
-                    "provinsi": "Provinsi",
-
-                    "jenis_beras": "Jenis Beras",
-
-                    "rata_rata_harga_provinsi": "Harga Provinsi (PIHPS)",
-
-                    "harga_grosir_nasional": "Harga Grosir Nasional",
-
-                    "gap_provinsi_grosir": "Gap Harga",
-
-                    "gap_persen": "Gap (%)",
-
-                }
-
-            )
-
-            st.dataframe(display, use_container_width=True, hide_index=True)
-
-
-
-            st.warning(
-
-                "Gap ini adalah selisih deskriptif. Harga PIHPS "
-
-                "berdasarkan jenis beras dibandingkan dengan harga grosir "
-
-                "nasional yang tidak dirinci menurut jenis. Karena itu, "
-
-                "gap bukan margin keuntungan dan tidak selalu merupakan "
-
-                "perbandingan kategori yang setara."
-
-            )
-
-
-
-
-
-# =========================================================
-# FOOTER
-# =========================================================
-st.divider()
-
-st.caption(
-
-    "BebekBerazz | Indonesian Rice Price Data Warehouse & Analytics"
-
-)
+        fig = px.bar(d, x='bulan_nama', y='harga', color='jenis_beras', barmode='group',
+                     color_discrete_sequence=COLOR_PALETTE)
+    fig.update_layout(title=f"Harga di {selected_pasar} ({selected_prov})",
+                      xaxis_title="Bulan", yaxis_title="Rp/kg", legend_title=None)
+    fig.update_yaxes(range=[d['harga'].min() * 0.9, d['harga'].max() * 1.05])
+    st.plotly_chart(style_fig(fig, 430), use_container_width=True)
+
+    with st.expander("📋 Lihat & unduh tabel data"):
+        tbl = (d.pivot_table(index='bulan_nama', columns='jenis_beras', values='harga')
+                 .reindex(month_order(d)))
+        st.dataframe(tbl.style.format("{:,.0f}"), use_container_width=True)
+        st.download_button("⬇️ Unduh CSV", tbl.to_csv().encode("utf-8"),
+                           file_name=f"harga_{selected_pasar}.csv", mime="text/csv")
+
+# -----------------------------------------------------------------------------
+# HALAMAN 4: PRICE GAP
+# -----------------------------------------------------------------------------
+elif menu == "gap":
+    st.subheader("🔍 Selisih Harga Provinsi vs Grosir Nasional")
+    st.markdown('<p class="section-note">Gap positif (merah) = harga provinsi LEBIH MAHAL dari grosir nasional. '
+                'Gap negatif (hijau) = LEBIH MURAH.</p>', unsafe_allow_html=True)
+
+    df_gap = safe_load("SELECT * FROM price_gap_summary ORDER BY bulan_num")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        selected_jenis = st.selectbox("Jenis Beras:", sorted(df_gap['jenis_beras'].unique()))
+    d = df_gap[df_gap['jenis_beras'] == selected_jenis]
+    with c2:
+        bulan_opts = month_order(d)
+        selected_bulan = st.selectbox("Bulan:", bulan_opts, index=len(bulan_opts) - 1)
+
+    has_prov = 'provinsi' in d.columns
+    if has_prov:
+        dm = d[d['bulan_nama'] == selected_bulan].groupby('provinsi')['gap_provinsi_grosir'] \
+              .mean().reset_index().sort_values('gap_provinsi_grosir')
+
+        k1, k2, k3 = st.columns(3)
+        with k1:
+            kpi("Rata-rata Gap", rp(dm['gap_provinsi_grosir'].mean()), note=f"Bulan {selected_bulan}")
+        with k2:
+            top = dm.iloc[-1]
+            kpi("Paling Mahal vs Grosir", top['provinsi'],
+                note=f"+{rp(top['gap_provinsi_grosir'])}/kg", small=True)
+        with k3:
+            low = dm.iloc[0]
+            kpi("Paling Murah vs Grosir", low['provinsi'],
+                note=f"{rp(low['gap_provinsi_grosir'])}/kg", small=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        dm['warna'] = dm['gap_provinsi_grosir'].apply(lambda v: "Lebih mahal" if v > 0 else "Lebih murah")
+        fig = px.bar(dm, x='gap_provinsi_grosir', y='provinsi', orientation='h', color='warna',
+                     color_discrete_map={"Lebih mahal": "#F56565", "Lebih murah": "#48BB78"},
+                     title=f"Gap Harga per Provinsi — {selected_jenis} ({selected_bulan})",
+                     labels={'gap_provinsi_grosir': 'Selisih (Rp/kg)', 'provinsi': ''})
+        fig.update_layout(legend_title=None, hovermode="closest")
+        st.plotly_chart(style_fig(fig, max(450, len(dm) * 22)), use_container_width=True)
+
+    with st.expander("📦 Lihat sebaran gap sepanjang waktu (box plot)"):
+        st.caption("Kotak = 50% provinsi di tengah. Garis tengah = median. Titik = tiap provinsi.")
+        fig_b = px.box(d, x='bulan_nama', y='gap_provinsi_grosir', points="all",
+                       labels={'bulan_nama': 'Bulan', 'gap_provinsi_grosir': 'Selisih (Rp/kg)'},
+                       color_discrete_sequence=['#F6C445'])
+        fig_b.add_hline(y=0, line_dash="dash", line_color="#FFFFFF")
+        st.plotly_chart(style_fig(fig_b, 420, False), use_container_width=True)
