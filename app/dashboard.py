@@ -966,6 +966,9 @@ elif menu == "prov":
 # -----------------------------------------------------------------------------
 # HALAMAN 3: JELAJAH PASAR
 # -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# HALAMAN 3: JELAJAH PASAR
+# -----------------------------------------------------------------------------
 elif menu == "market":
     st.subheader("🏪 Jelajah Pasar")
     df_market = safe_load("SELECT * FROM market_summary ORDER BY bulan_num")
@@ -1007,6 +1010,141 @@ elif menu == "market":
         st.dataframe(tbl.style.format("{:,.0f}"), use_container_width=True)
         st.download_button("⬇️ Unduh CSV", tbl.to_csv().encode("utf-8"),
                            file_name=f"harga_{selected_pasar}.csv", mime="text/csv")
+
+    # ------------------------- PERBANDINGAN ANTAR PASAR -------------------------
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.divider()
+    st.markdown(f"##### ⚖️ Perbandingan Antar Pasar di {selected_prov}")
+    st.markdown(
+        f'<p class="section-note">Bandingkan harga antar pasar dalam satu provinsi. '
+        f'Pasar yang sedang kamu pilih (<b>{selected_pasar}</b>) ditandai warna emas.</p>',
+        unsafe_allow_html=True,
+    )
+
+    daftar_pasar = sorted(df_mp['nama_pasar'].unique())
+    if len(daftar_pasar) < 2:
+        st.info(f"Saat ini hanya tersedia 1 pasar di {selected_prov}, sehingga perbandingan antar pasar belum dapat ditampilkan.")
+    else:
+        cp1, cp2 = st.columns(2)
+        with cp1:
+            jenis_cmp = st.selectbox(
+                "Jenis Beras (Perbandingan):",
+                sorted(df_mp['jenis_beras'].unique()),
+                key="cmp_jenis_pasar",
+            )
+        df_cmp_j = df_mp[df_mp['jenis_beras'] == jenis_cmp]
+        bulan_cmp_opts = month_order(df_cmp_j)
+        with cp2:
+            bulan_cmp = st.selectbox(
+                "Bulan:",
+                bulan_cmp_opts,
+                index=len(bulan_cmp_opts) - 1,
+                key="cmp_bulan_pasar",
+            )
+
+        # Data perbandingan pada bulan terpilih
+        dm_bulan = (
+            df_cmp_j[df_cmp_j['bulan_nama'] == bulan_cmp]
+            .groupby('nama_pasar', as_index=False)['harga']
+            .mean()
+            .sort_values('harga')
+        )
+
+        if not dm_bulan.empty:
+            pasar_termurah = dm_bulan.iloc[0]
+            pasar_termahal = dm_bulan.iloc[-1]
+            rata_prov_pasar = dm_bulan['harga'].mean()
+            selisih_pasar = pasar_termahal['harga'] - pasar_termurah['harga']
+
+            pk1, pk2, pk3 = st.columns(3)
+            with pk1:
+                kpi("Rata-rata Pasar Provinsi", rp(rata_prov_pasar), note=f"{len(dm_bulan)} pasar terdata")
+            with pk2:
+                kpi("Pasar Termahal", pasar_termahal['nama_pasar'],
+                    note=f"{rp(pasar_termahal['harga'])}/kg", small=True)
+            with pk3:
+                kpi("Pasar Termurah", pasar_termurah['nama_pasar'],
+                    note=f"{rp(pasar_termurah['harga'])}/kg (selisih {rp(selisih_pasar)})", small=True)
+
+            # Insight posisi pasar yang sedang dipilih
+            pos_sel = dm_bulan[dm_bulan['nama_pasar'] == selected_pasar]
+            if not pos_sel.empty:
+                harga_sel = pos_sel['harga'].iloc[0]
+                diff_avg = harga_sel - rata_prov_pasar
+                status_str = (
+                    f"<b>{rp(abs(diff_avg))}/kg lebih mahal</b> dari"
+                    if diff_avg > 0
+                    else (
+                        f"<b>{rp(abs(diff_avg))}/kg lebih murah</b> dari"
+                        if diff_avg < 0
+                        else "<b>sama dengan</b>"
+                    )
+                )
+                insight(
+                    f"Pada <b>{bulan_cmp}</b> untuk <b>{jenis_cmp}</b>, harga di "
+                    f"<b>{selected_pasar}</b> ({rp(harga_sel)}/kg) tercatat {status_str} "
+                    f"rata-rata pasar di {selected_prov}."
+                )
+
+            # Tab visualisasi: Peringkat per Bulan vs Tren Multi-Pasar
+            tab_rank, tab_trend = st.tabs(["📊 Peringkat Harga Bulan Ini", "📈 Tren Antar Pasar"])
+
+            with tab_rank:
+                bar_colors = [
+                    "#F6C445" if p == selected_pasar else "#4299E1"
+                    for p in dm_bulan['nama_pasar']
+                ]
+                fig_rank = go.Figure(go.Bar(
+                    x=dm_bulan['harga'],
+                    y=dm_bulan['nama_pasar'],
+                    orientation='h',
+                    marker_color=bar_colors,
+                    text=dm_bulan['harga'].map(lambda v: f"Rp {v:,.0f}"),
+                    textposition="outside",
+                    cliponaxis=False,
+                    hovertemplate="<b>%{y}</b><br>Rp %{x:,.0f}/kg<extra></extra>",
+                ))
+                fig_rank.update_layout(
+                    title=f"Perbandingan Harga {jenis_cmp} Antar Pasar ({bulan_cmp})",
+                    xaxis_title="Harga (Rp/kg)",
+                    yaxis_title=None,
+                )
+                fig_rank.update_xaxes(range=[dm_bulan['harga'].min() * 0.92, dm_bulan['harga'].max() * 1.08])
+                fig_rank = style_fig(fig_rank, max(350, len(dm_bulan) * 32), False)
+                fig_rank.update_layout(hovermode="closest", margin=dict(l=10, r=55, t=50, b=10))
+                fig_rank.update_yaxes(tickformat=None)
+                st.plotly_chart(fig_rank, use_container_width=True)
+
+            with tab_trend:
+                pasar_pilih = st.multiselect(
+                    "Pilih pasar yang ingin dibandingkan trennya:",
+                    daftar_pasar,
+                    default=daftar_pasar[:5],  # maksimal 5 default agar grafik tetap rapi
+                    key="cmp_multi_pasar",
+                )
+                if pasar_pilih:
+                    d_trend = df_cmp_j[df_cmp_j['nama_pasar'].isin(pasar_pilih)]
+                    fig_tr = px.line(
+                        d_trend,
+                        x='bulan_nama',
+                        y='harga',
+                        color='nama_pasar',
+                        markers=True,
+                        title=f"Tren Harga {jenis_cmp} Antar Pasar di {selected_prov}",
+                        labels={'bulan_nama': 'Bulan', 'harga': 'Rp/kg', 'nama_pasar': 'Pasar'},
+                        color_discrete_sequence=COLOR_PALETTE,
+                    )
+                    fig_tr.update_yaxes(range=[d_trend['harga'].min() * 0.95, d_trend['harga'].max() * 1.03])
+                    st.plotly_chart(style_fig(fig_tr, 420), use_container_width=True)
+                else:
+                    st.warning("Pilih minimal satu pasar untuk melihat grafik tren.")
+
+            with st.expander("📋 Lihat matriks perbandingan seluruh pasar & bulan"):
+                tbl_cmp = (
+                    df_cmp_j.pivot_table(index='nama_pasar', columns='bulan_nama', values='harga')
+                    .reindex(columns=bulan_cmp_opts)
+                )
+                st.dataframe(tbl_cmp.style.format("{:,.0f}", na_rep="-"), use_container_width=True)
 
 # -----------------------------------------------------------------------------
 # HALAMAN 4: PRICE GAP
