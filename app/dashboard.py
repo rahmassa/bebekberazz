@@ -857,7 +857,7 @@ if menu == "home":
                 f.update_xaxes(range=[d['nilai'].min() * 0.9, d['nilai'].max() * 1.02])
             st.plotly_chart(style_fig(f, 300, False), use_container_width=True)
 
-    # ------------------------- TREN -------------------------
+# ------------------------- TREN -------------------------
     st.markdown("<br>", unsafe_allow_html=True)
     fig = go.Figure()
     if not df_grosir.empty:
@@ -872,6 +872,82 @@ if menu == "home":
     ys = list(ritel_bulan['avg_harga']) + list(df_grosir['harga'])
     fig.update_yaxes(range=[min(ys) * 0.97, max(ys) * 1.03])
     st.plotly_chart(style_fig(fig, 380), use_container_width=True)
+
+    # ------------------------- PRODUKSI BERAS NASIONAL -------------------------
+    try:
+        df_prod = load_data("SELECT * FROM produksi_summary ORDER BY tahun, bulan_num")
+    except Exception:
+        df_prod = pd.DataFrame(columns=['tahun', 'bulan_num', 'bulan_nama', 'produksi_ton'])
+
+    if not df_prod.empty:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.divider()
+        st.markdown("##### 🌾 Produksi Beras Nasional Bulanan (BDSP)")
+        st.markdown(
+            '<p class="section-note">Gambaran pasokan dan pola musim panen beras nasional '
+            '(dalam satuan ton).</p>',
+            unsafe_allow_html=True,
+        )
+
+        tahun_opts = sorted(df_prod['tahun'].unique())
+        py1, _ = st.columns([1, 3])
+        with py1:
+            tahun_prod_sel = st.selectbox(
+                "Tahun Produksi:",
+                tahun_opts,
+                index=len(tahun_opts) - 1,
+                key="home_tahun_prod",
+            )
+
+        dp = df_prod[df_prod['tahun'] == tahun_prod_sel].sort_values('bulan_num')
+
+        total_prod = dp['produksi_ton'].sum()
+        puncak_row = dp.loc[dp['produksi_ton'].idxmax()]
+        terendah_row = dp.loc[dp['produksi_ton'].idxmin()]
+
+        pk1, pk2, pk3 = st.columns(3)
+        with pk1:
+            kpi(f"Total Produksi ({tahun_prod_sel})", f"{total_prod:,.0f} ton",
+                note=f"Rata-rata {dp['produksi_ton'].mean():,.0f} ton/bulan")
+        with pk2:
+            kpi("Puncak Panen (Tertinggi)", puncak_row['bulan_nama'],
+                note=f"{puncak_row['produksi_ton']:,.0f} ton", small=True)
+        with pk3:
+            kpi("Produksi Terendah (Paceklik)", terendah_row['bulan_nama'],
+                note=f"{terendah_row['produksi_ton']:,.0f} ton", small=True)
+
+        insight(
+            f"Pada tahun <b>{tahun_prod_sel}</b>, puncak produksi beras nasional terjadi pada bulan "
+            f"<b>{puncak_row['bulan_nama']}</b> ({puncak_row['produksi_ton']:,.0f} ton) dan "
+            f"titik terendah pada bulan <b>{terendah_row['bulan_nama']}</b> "
+            f"({terendah_row['produksi_ton']:,.0f} ton)."
+        )
+
+        fig_prod = go.Figure()
+        fig_prod.add_trace(go.Bar(
+            x=dp['bulan_nama'],
+            y=dp['produksi_ton'],
+            name="Produksi (Ton)",
+            marker_color="#48BB78",
+            text=dp['produksi_ton'].map(lambda v: f"{v/1e6:.2f} jt"),
+            textposition="outside",
+            hovertemplate="<b>%{x}</b><br>%{y:,.2f} ton<extra></extra>",
+        ))
+        fig_prod.add_trace(go.Scatter(
+            x=dp['bulan_nama'],
+            y=dp['produksi_ton'],
+            name="Tren Bulanan",
+            mode="lines+markers",
+            line=dict(color="#F6C445", width=2.5),
+            hoverinfo="skip",
+        ))
+        fig_prod.update_layout(
+            title=f"Tren Produksi Beras Nasional Tahun {tahun_prod_sel} (Ton)",
+            xaxis_title="Bulan",
+            yaxis_title="Produksi (Ton)",
+        )
+        fig_prod.update_yaxes(range=[0, dp['produksi_ton'].max() * 1.15])
+        st.plotly_chart(style_fig(fig_prod, 400), use_container_width=True)
 
 # -----------------------------------------------------------------------------
 # HALAMAN 2: ANALISIS PROVINSI
