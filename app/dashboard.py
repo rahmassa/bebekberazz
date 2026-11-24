@@ -185,7 +185,7 @@ def load_data(query: str) -> pd.DataFrame:
     conn = duckdb.connect(CATALOG_PATH, read_only=True)
     try:
         if os.path.exists("databases/bebek_grosir.duckdb"):
-            conn.execute("ATTACH IF NOT EXISTS 'databases/bebek_grosir.duckdb' AS db_grosir;")
+            conn.execute("ATTACH IF NOT EXISTS 'databases/bebek_grosir.duckdb' AS db_grosir (READ_ONLY);")
         if os.path.exists("databases/bebek_produksi.duckdb"):
             conn.execute("ATTACH IF NOT EXISTS 'databases/bebek_produksi.duckdb' AS db_produksi (READ_ONLY);")
         return conn.execute(query).df()
@@ -241,20 +241,47 @@ def insight(text):
     st.markdown(f'<div class="insight-box">💡 {text}</div>', unsafe_allow_html=True)
 
 
-def pct_change(series):
+def pct_change(series, periods=None):
     if len(series) < 2 or series.iloc[-2] == 0:
+        return None
+    if periods is not None:
+        if periods.iloc[-1] - pd.DateOffset(months=1) != periods.iloc[-2]:
+            return None
+    if pd.isna(series.iloc[-2]) or pd.isna(series.iloc[-1]):
         return None
     return (series.iloc[-1] - series.iloc[-2]) / series.iloc[-2] * 100
 
 
+MONTH_NAMES = dict(enumerate([
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+], 1))
+
+
+def with_period(df):
+    """Tambahkan periode tanpa mengubah tahun dan bulan sumber."""
+    d = df.copy()
+    d['periode'] = pd.to_datetime(dict(year=d['tahun'], month=d['bulan_num'], day=1))
+    d['periode_label'] = d['periode'].dt.month.map(MONTH_NAMES) + ' ' + d['periode'].dt.year.astype(str)
+    return d.sort_values('periode').reset_index(drop=True)
+
+
 def month_order(df):
-    return (df.drop_duplicates('bulan_num')
-              .sort_values('bulan_num')['bulan_nama'].tolist())
+    return df.sort_values('periode').drop_duplicates('periode')['periode_label'].tolist()
 
 
 def month_map(df):
-    """{'Januari': 1, 'Februari': 2, ...}"""
-    return df.drop_duplicates('bulan_num').set_index('bulan_nama')['bulan_num'].to_dict()
+    return df.drop_duplicates('periode').set_index('periode_label')['periode'].to_dict()
+
+
+def style_period_fig(fig, height=500, legend_bottom=True):
+    fig = style_fig(fig, height, legend_bottom)
+    fig.update_xaxes(type='date', dtick='M1', tickformat='%b %Y',
+                     tickangle=-45, tickfont=dict(size=10), hoverformat='%B %Y')
+    fig.update_layout(xaxis_title='Periode', margin=dict(l=10, r=10, t=50, b=110))
+    if legend_bottom:
+        fig.update_layout(legend=dict(orientation='h', y=-0.35, x=0, title=None))
+    return fig
 
 
 def source_footer():
@@ -625,22 +652,22 @@ def show_map(dfv, label, fmt=",.0f", scale=PRICE_SCALE, midpoint=None, highlight
                 st.write(", ".join(no_data))
 
 
-def prov_values(df, jenis_list, bulan_num):
+def prov_values(df, jenis_list, periode):
     """Rata-rata harga per provinsi pada satu bulan -> kolom: provinsi, nilai."""
-    d = df[df["bulan_num"] == bulan_num]
+    d = df[df["periode"] == periode]
     if jenis_list:
         d = d[d["jenis_beras"].isin(jenis_list)]
     return (d.groupby("provinsi")["avg_harga"].mean().reset_index()
              .rename(columns={"avg_harga": "nilai"}))
 
 
-def prov_change(df, jenis_list, bulan_num):
-    """Perubahan % vs bulan sebelumnya. Return None kalau tidak ada bulan sebelumnya."""
-    prev = sorted(n for n in df["bulan_num"].unique() if n < bulan_num)
-    if not prev:
+def prov_change(df, jenis_list, periode):
+    """Bandingkan dengan bulan kalender sebelumnya, termasuk lintas tahun."""
+    prev = pd.Timestamp(periode) - pd.DateOffset(months=1)
+    cur = prov_values(df, jenis_list, periode)
+    old = prov_values(df, jenis_list, prev).rename(columns={"nilai": "lama"})
+    if old.empty:
         return None
-    cur = prov_values(df, jenis_list, bulan_num)
-    old = prov_values(df, jenis_list, prev[-1]).rename(columns={"nilai": "lama"})
     m = cur.merge(old, on="provinsi")
     m = m[m["lama"] > 0]
     m["nilai"] = (m["nilai"] - m["lama"]) / m["lama"] * 100
@@ -776,29 +803,15 @@ if menu == "home":
         "SELECT * FROM province_summary ORDER BY tahun, bulan_num"
     )
 
-    # Membuat tanggal berdasarkan tahun dan bulan
-    df_prov['periode'] = pd.to_datetime(dict(
-        year=df_prov['tahun'],
-        month=df_prov['bulan_num'],
-        day=1
-    ))
+    df_prov = with_period(df_prov)
+    df_grosir = with_period(df_grosir)
+    if df_prov.empty:
+        st.warning("Data ritel belum tersedia.")
+        st.stop()
 
-    df_grosir['periode'] = pd.to_datetime(dict(
-        year=df_grosir['tahun'],
-        month=df_grosir['bulan_num'],
-        day=1
-    ))
-
-    df_grosir = df_grosir.sort_values('periode')
-
-    # Rata-rata ritel berdasarkan bulan dan tahun
     ritel_bulan = (
-        df_prov.groupby(
-            ['periode', 'tahun', 'bulan_num', 'bulan_nama']
-        )['avg_harga']
-        .mean()
-        .reset_index()
-        .sort_values('periode')
+        df_prov.groupby(['periode', 'tahun', 'bulan_num', 'bulan_nama', 'periode_label'])['avg_harga']
+        .mean().reset_index().sort_values('periode')
     )
 
     # Mengambil periode terbaru
@@ -813,18 +826,21 @@ if menu == "home":
 
     grosir_last = df_grosir['harga'].iloc[-1] if not df_grosir.empty else 0
     ritel_last = ritel_bulan['avg_harga'].iloc[-1]
-    gap_last = ritel_last - grosir_last if grosir_last else None
+    common = ritel_bulan.merge(df_grosir[['periode', 'harga']], on='periode', how='inner').dropna(subset=['avg_harga', 'harga'])
+    common = common.sort_values('periode')
+    gap_last = common['avg_harga'].iloc[-1] - common['harga'].iloc[-1] if not common.empty else None
+    gap_note = f"Periode: {common['periode_label'].iloc[-1]}" if not common.empty else "Tidak ada periode yang cocok"
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         kpi("Grosir Nasional (terbaru)", rp(grosir_last),
-            pct_change(df_grosir['harga']) if not df_grosir.empty else None)
+            pct_change(df_grosir['harga'], df_grosir['periode']) if not df_grosir.empty else None)
     with c2:
-        kpi("Rata-rata Ritel Provinsi", rp(ritel_last), pct_change(ritel_bulan['avg_harga']))
+        kpi("Rata-rata Ritel Provinsi", rp(ritel_last), pct_change(ritel_bulan['avg_harga'], ritel_bulan['periode']))
     with c3:
         kpi("Selisih Ritel − Grosir",
             rp(gap_last) if gap_last is not None else "-",
-            note="Margin rantai distribusi")
+            note=gap_note)
     with c4:
         kpi("Provinsi Termahal", last_prov.index[0],
             note=f"{rp(last_prov.iloc[0])}/kg", small=True)
@@ -832,8 +848,8 @@ if menu == "home":
     if len(ritel_bulan) >= 2:
         first, last = ritel_bulan['avg_harga'].iloc[0], ritel_bulan['avg_harga'].iloc[-1]
         arah = "naik" if last > first else "turun"
-        insight(f"Sejak <b>{ritel_bulan['bulan_nama'].iloc[0]}</b> hingga "
-                f"<b>{ritel_bulan['bulan_nama'].iloc[-1]}</b>, harga ritel rata-rata <b>{arah} "
+        insight(f"Sejak <b>{ritel_bulan['periode_label'].iloc[0]}</b> hingga "
+                f"<b>{ritel_bulan['periode_label'].iloc[-1]}</b>, harga ritel rata-rata <b>{arah} "
                 f"{abs(last-first)/first*100:.1f}%</b>. Provinsi termurah saat ini: "
                 f"<b>{last_prov.index[-1]}</b> ({rp(last_prov.iloc[-1])}/kg).")
 
@@ -848,7 +864,7 @@ if menu == "home":
 
     m1, m2, m3 = st.columns(3)
     with m1:
-        bulan_sel = st.selectbox("Bulan:", bulan_opts, index=len(bulan_opts) - 1, key="home_bulan")
+        bulan_sel = st.selectbox("Periode:", bulan_opts, index=len(bulan_opts) - 1, key="home_bulan")
     with m2:
         mode_sel = st.selectbox("Tampilkan:", ["Harga rata-rata (Rp/kg)", "Perubahan vs bulan lalu (%)"],
                                 key="home_mode")
@@ -856,17 +872,17 @@ if menu == "home":
         jenis_sel = st.selectbox("Jenis beras:", [ALL_JENIS] + jenis_all, key="home_jenis")
 
     jenis_filter = None if jenis_sel == ALL_JENIS else [jenis_sel]
-    bnum = bmap[bulan_sel]
+    periode_sel = bmap[bulan_sel]
 
     is_change = mode_sel.startswith("Perubahan")
     vals = None
     if is_change:
-        vals = prov_change(df_prov, jenis_filter, bnum)
+        vals = prov_change(df_prov, jenis_filter, periode_sel)
         if vals is None or vals.empty:
-            st.info("Bulan pertama belum punya pembanding bulan lalu, jadi ditampilkan harga rata-rata.")
+            st.info("Data bulan sebelumnya tidak tersedia, jadi ditampilkan harga rata-rata.")
             is_change = False
     if not is_change:
-        vals = prov_values(df_prov, jenis_filter, bnum)
+        vals = prov_values(df_prov, jenis_filter, periode_sel)
 
     if is_change:
         label, fmt, scale, mid = "Perubahan (%)", "+.2f", CHANGE_SCALE, 0
@@ -875,7 +891,10 @@ if menu == "home":
         label, fmt, scale, mid = "Rp/kg", ",.0f", PRICE_SCALE, None
         fmt_txt = lambda v: f"{v:,.0f}"
 
-    show_map(vals, label, fmt=fmt, scale=scale, midpoint=mid, height=600)
+    if vals.empty:
+        st.info("Tidak ada data untuk jenis beras dan periode pilihan.")
+    else:
+        show_map(vals, label, fmt=fmt, scale=scale, midpoint=mid, height=600)
     st.caption(f"📅 {bulan_sel} · {jenis_sel}")
 
     # ------------------------- PERINGKAT -------------------------
@@ -898,8 +917,9 @@ if menu == "home":
     st.markdown("<br>", unsafe_allow_html=True)
 
     # Rentang periode penuh dari gabungan data grosir & ritel
-    min_periode = min(df_grosir['periode'].min(), ritel_bulan['periode'].min())
-    max_periode = max(df_grosir['periode'].max(), ritel_bulan['periode'].max())
+    semua_periode = pd.concat([df_grosir['periode'], ritel_bulan['periode']]).dropna()
+    min_periode = semua_periode.min()
+    max_periode = semua_periode.max()
 
     full_periods = pd.DataFrame({
         'periode': pd.date_range(start=min_periode, end=max_periode, freq='MS')
@@ -1230,7 +1250,10 @@ if menu == "home":
 # -----------------------------------------------------------------------------
 elif menu == "prov":
     st.subheader("🗺️ Analisis Provinsi")
-    df_prov = safe_load("SELECT * FROM province_summary ORDER BY bulan_num")
+    df_prov = with_period(safe_load("SELECT * FROM province_summary ORDER BY tahun, bulan_num"))
+    if df_prov.empty:
+        st.warning("Data provinsi belum tersedia.")
+        st.stop()
 
     c1, c2 = st.columns([1, 2])
     with c1:
@@ -1245,17 +1268,20 @@ elif menu == "prov":
 
     d = df_prov[(df_prov['provinsi'] == selected_prov) &
                 (df_prov['jenis_beras'].isin(selected_jenis))]
+    if d.empty:
+        st.warning("Tidak ada data untuk provinsi dan jenis beras pilihan.")
+        st.stop()
     nasional = (df_prov[df_prov['jenis_beras'].isin(selected_jenis)]
-                .groupby(['bulan_num', 'bulan_nama'])['avg_harga'].mean()
-                .reset_index().sort_values('bulan_num'))
+                .groupby('periode', as_index=False)['avg_harga'].mean()
+                .sort_values('periode'))
 
-    prov_bulan = d.groupby(['bulan_num', 'bulan_nama'])['avg_harga'].mean().reset_index().sort_values('bulan_num')
+    prov_bulan = d.groupby('periode', as_index=False)['avg_harga'].mean().sort_values('periode')
     k1, k2, k3 = st.columns(3)
     with k1:
         kpi("Harga Terbaru (rata-rata)", rp(prov_bulan['avg_harga'].iloc[-1]),
-            pct_change(prov_bulan['avg_harga']))
+            pct_change(prov_bulan['avg_harga'], prov_bulan['periode']))
     with k2:
-        selisih = prov_bulan['avg_harga'].iloc[-1] - nasional['avg_harga'].iloc[-1]
+        selisih = prov_bulan['avg_harga'].iloc[-1] - nasional.loc[nasional['periode'] == prov_bulan['periode'].iloc[-1], 'avg_harga'].iloc[0]
         kpi("vs Rata-rata Nasional", f"{'+' if selisih >= 0 else '−'}{rp(abs(selisih))}",
             note="lebih mahal dari nasional" if selisih > 0 else "lebih murah dari nasional")
     with k3:
@@ -1264,14 +1290,14 @@ elif menu == "prov":
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    fig = px.line(d, x='bulan_nama', y='avg_harga', color='jenis_beras', markers=True,
+    fig = px.line(d, x='periode', y='avg_harga', color='jenis_beras', markers=True,
                   title=f"Perkembangan Harga Beras di {selected_prov}",
-                  labels={'bulan_nama': 'Bulan', 'avg_harga': 'Rp/kg', 'jenis_beras': 'Jenis'},
+                  labels={'periode': 'Periode', 'avg_harga': 'Rp/kg', 'jenis_beras': 'Jenis'},
                   color_discrete_sequence=COLOR_PALETTE)
-    fig.add_trace(go.Scatter(x=nasional['bulan_nama'], y=nasional['avg_harga'],
+    fig.add_trace(go.Scatter(x=nasional['periode'], y=nasional['avg_harga'],
                              name="Rata-rata Nasional", mode="lines",
                              line=dict(color="#FFFFFF", dash="dash", width=2)))
-    st.plotly_chart(style_fig(fig, 430), use_container_width=True)
+    st.plotly_chart(style_period_fig(fig), use_container_width=True)
 
     # ------------------------- PETA PROVINSI 3D -------------------------
     st.markdown("##### 🗺️ Peta Perbandingan Antar Provinsi (3D)")
@@ -1282,10 +1308,13 @@ elif menu == "prov":
     bmap = month_map(df_prov)
     mc1, _ = st.columns([1, 2])
     with mc1:
-        bulan_peta = st.selectbox("Bulan pada peta:", bulan_opts,
+        bulan_peta = st.selectbox("Periode pada peta:", bulan_opts,
                                   index=len(bulan_opts) - 1, key="prov_bulan")
 
     vals = prov_values(df_prov, selected_jenis, bmap[bulan_peta])
+    if vals.empty:
+        st.info("Tidak ada data untuk jenis beras dan periode pilihan.")
+        st.stop()
     ranked = vals.sort_values("nilai", ascending=False).reset_index(drop=True)
     pos = ranked.index[ranked["provinsi"] == selected_prov]
     if len(pos):
@@ -1323,7 +1352,10 @@ elif menu == "prov":
 # -----------------------------------------------------------------------------
 elif menu == "market":
     st.subheader("🏪 Jelajah Pasar")
-    df_market = safe_load("SELECT * FROM market_summary ORDER BY bulan_num")
+    df_market = with_period(safe_load("SELECT * FROM market_summary ORDER BY tahun, bulan_num"))
+    if df_market.empty:
+        st.warning("Data pasar belum tersedia.")
+        st.stop()
 
     c1, c2 = st.columns(2)
     with c1:
@@ -1334,30 +1366,30 @@ elif menu == "market":
 
     d = df_mp[df_mp['nama_pasar'] == selected_pasar]
 
-    last_m = d['bulan_num'].max()
-    latest = d[d['bulan_num'] == last_m].groupby('jenis_beras')['harga'].mean()
+    last_m = d['periode'].max()
+    latest = d[d['periode'] == last_m].groupby('jenis_beras')['harga'].mean()
     cols = st.columns(max(len(latest), 1))
     for col, (jenis, val) in zip(cols, latest.items()):
-        hist = d[d['jenis_beras'] == jenis].sort_values('bulan_num')['harga']
+        hist = d[d['jenis_beras'] == jenis].groupby('periode', as_index=False)['harga'].mean().sort_values('periode')
         with col:
-            kpi(jenis, rp(val), pct_change(hist))
+            kpi(jenis, rp(val), pct_change(hist['harga'], hist['periode']))
 
     st.markdown("<br>", unsafe_allow_html=True)
 
     mode = st.radio("Tampilan grafik:", ["📈 Garis (tren)", "📊 Batang (bandingkan)"], horizontal=True)
     if mode.startswith("📈"):
-        fig = px.line(d, x='bulan_nama', y='harga', color='jenis_beras', markers=True,
+        fig = px.line(d, x='periode', y='harga', color='jenis_beras', markers=True,
                       color_discrete_sequence=COLOR_PALETTE)
     else:
-        fig = px.bar(d, x='bulan_nama', y='harga', color='jenis_beras', barmode='group',
+        fig = px.bar(d, x='periode', y='harga', color='jenis_beras', barmode='group',
                      color_discrete_sequence=COLOR_PALETTE)
     fig.update_layout(title=f"Harga di {selected_pasar} ({selected_prov})",
                       xaxis_title="Bulan", yaxis_title="Rp/kg", legend_title=None)
     fig.update_yaxes(range=[d['harga'].min() * 0.9, d['harga'].max() * 1.05])
-    st.plotly_chart(style_fig(fig, 430), use_container_width=True)
+    st.plotly_chart(style_period_fig(fig), use_container_width=True)
 
     with st.expander("📋 Lihat & unduh tabel data"):
-        tbl = (d.pivot_table(index='bulan_nama', columns='jenis_beras', values='harga')
+        tbl = (d.pivot_table(index='periode_label', columns='jenis_beras', values='harga')
                  .reindex(month_order(d)))
         st.dataframe(tbl.style.format("{:,.0f}"), use_container_width=True)
         st.download_button("⬇️ Unduh CSV", tbl.to_csv().encode("utf-8"),
@@ -1388,7 +1420,7 @@ elif menu == "market":
         bulan_cmp_opts = month_order(df_cmp_j)
         with cp2:
             bulan_cmp = st.selectbox(
-                "Bulan:",
+                "Periode:",
                 bulan_cmp_opts,
                 index=len(bulan_cmp_opts) - 1,
                 key="cmp_bulan_pasar",
@@ -1396,7 +1428,7 @@ elif menu == "market":
 
         # Data perbandingan pada bulan terpilih
         dm_bulan = (
-            df_cmp_j[df_cmp_j['bulan_nama'] == bulan_cmp]
+            df_cmp_j[df_cmp_j['periode_label'] == bulan_cmp]
             .groupby('nama_pasar', as_index=False)['harga']
             .mean()
             .sort_values('harga')
@@ -1470,30 +1502,30 @@ elif menu == "market":
             with tab_trend:
                 pasar_pilih = st.multiselect(
                     "Pilih pasar yang ingin dibandingkan trennya:",
-                    daftar_pasar,
-                    default=daftar_pasar[:5],  # maksimal 5 default agar grafik tetap rapi
+                    sorted(df_cmp_j['nama_pasar'].unique()),
+                    default=sorted(df_cmp_j['nama_pasar'].unique())[:5],  # maksimal 5 default agar grafik tetap rapi
                     key="cmp_multi_pasar",
                 )
                 if pasar_pilih:
                     d_trend = df_cmp_j[df_cmp_j['nama_pasar'].isin(pasar_pilih)]
                     fig_tr = px.line(
                         d_trend,
-                        x='bulan_nama',
+                        x='periode',
                         y='harga',
                         color='nama_pasar',
                         markers=True,
                         title=f"Tren Harga {jenis_cmp} Antar Pasar di {selected_prov}",
-                        labels={'bulan_nama': 'Bulan', 'harga': 'Rp/kg', 'nama_pasar': 'Pasar'},
+                        labels={'periode': 'Periode', 'harga': 'Rp/kg', 'nama_pasar': 'Pasar'},
                         color_discrete_sequence=COLOR_PALETTE,
                     )
                     fig_tr.update_yaxes(range=[d_trend['harga'].min() * 0.95, d_trend['harga'].max() * 1.03])
-                    st.plotly_chart(style_fig(fig_tr, 420), use_container_width=True)
+                    st.plotly_chart(style_period_fig(fig_tr), use_container_width=True)
                 else:
                     st.warning("Pilih minimal satu pasar untuk melihat grafik tren.")
 
             with st.expander("📋 Lihat matriks perbandingan seluruh pasar & bulan"):
                 tbl_cmp = (
-                    df_cmp_j.pivot_table(index='nama_pasar', columns='bulan_nama', values='harga')
+                    df_cmp_j.pivot_table(index='nama_pasar', columns='periode_label', values='harga')
                     .reindex(columns=bulan_cmp_opts)
                 )
                 st.dataframe(tbl_cmp.style.format("{:,.0f}", na_rep="-"), use_container_width=True)
@@ -1506,7 +1538,11 @@ elif menu == "gap":
     st.markdown('<p class="section-note">Gap positif (merah) = harga provinsi LEBIH MAHAL dari grosir nasional. '
                 'Gap negatif (hijau) = LEBIH MURAH.</p>', unsafe_allow_html=True)
 
-    df_gap = safe_load("SELECT * FROM price_gap_summary ORDER BY bulan_num")
+    df_gap = with_period(safe_load("SELECT * FROM price_gap_summary ORDER BY tahun, bulan_num"))
+    df_gap = df_gap.dropna(subset=['gap_provinsi_grosir'])
+    if df_gap.empty:
+        st.warning("Belum ada data ritel dan grosir dengan periode yang cocok.")
+        st.stop()
 
     c1, c2 = st.columns(2)
     with c1:
@@ -1514,11 +1550,11 @@ elif menu == "gap":
     d = df_gap[df_gap['jenis_beras'] == selected_jenis]
     with c2:
         bulan_opts = month_order(d)
-        selected_bulan = st.selectbox("Bulan:", bulan_opts, index=len(bulan_opts) - 1)
+        selected_bulan = st.selectbox("Periode:", bulan_opts, index=len(bulan_opts) - 1)
 
     has_prov = 'provinsi' in d.columns
     if has_prov:
-        dm = d[d['bulan_nama'] == selected_bulan].groupby('provinsi')['gap_provinsi_grosir'] \
+        dm = d[d['periode_label'] == selected_bulan].groupby('provinsi')['gap_provinsi_grosir'] \
               .mean().reset_index().sort_values('gap_provinsi_grosir')
 
         k1, k2, k3 = st.columns(3)
@@ -1527,7 +1563,7 @@ elif menu == "gap":
         with k2:
             top = dm.iloc[-1]
             kpi("Paling Mahal vs Grosir", top['provinsi'],
-                note=f"+{rp(top['gap_provinsi_grosir'])}/kg", small=True)
+                note=f"{rp(top['gap_provinsi_grosir'])}/kg", small=True)
         with k3:
             low = dm.iloc[0]
             kpi("Paling Murah vs Grosir", low['provinsi'],
@@ -1544,11 +1580,11 @@ elif menu == "gap":
 
     with st.expander("📦 Lihat sebaran gap sepanjang waktu (box plot)"):
         st.caption("Kotak = 50% provinsi di tengah. Garis tengah = median. Titik = tiap provinsi.")
-        fig_b = px.box(d, x='bulan_nama', y='gap_provinsi_grosir', points="all",
-                       labels={'bulan_nama': 'Bulan', 'gap_provinsi_grosir': 'Selisih (Rp/kg)'},
+        fig_b = px.box(d, x='periode', y='gap_provinsi_grosir', points="all",
+                       labels={'periode': 'Periode', 'gap_provinsi_grosir': 'Selisih (Rp/kg)'},
                        color_discrete_sequence=['#F6C445'])
         fig_b.add_hline(y=0, line_dash="dash", line_color="#FFFFFF")
-        st.plotly_chart(style_fig(fig_b, 420, False), use_container_width=True)
+        st.plotly_chart(style_period_fig(fig_b, 500, False), use_container_width=True)
 
 # -----------------------------------------------------------------------------
 # FOOTER (muncul di semua halaman)
