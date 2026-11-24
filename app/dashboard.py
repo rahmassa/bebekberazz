@@ -1357,6 +1357,16 @@ elif menu == "market":
         st.warning("Data pasar belum tersedia.")
         st.stop()
 
+    # Filter tahun sebelum pemilihan pasar; default tetap seluruh histori.
+    tahun_market_opts = sorted(df_market['tahun'].unique().tolist())
+    st.caption("Tahun tersedia di database pasar: " + ", ".join(map(str, tahun_market_opts)))
+    tahun_market = st.selectbox(
+        "Tahun data pasar:", ["Semua tahun"] + tahun_market_opts,
+        key="market_year", format_func=str,
+    )
+    if tahun_market != "Semua tahun":
+        df_market = df_market[df_market['tahun'] == tahun_market].copy()
+
     c1, c2 = st.columns(2)
     with c1:
         selected_prov = st.selectbox("Pilih Provinsi:", sorted(df_market['provinsi'].unique()))
@@ -1366,7 +1376,13 @@ elif menu == "market":
 
     d = df_mp[df_mp['nama_pasar'] == selected_pasar]
 
+    periode_pasar = month_order(d)
+    st.caption(f"Data pasar terpilih: {periode_pasar[0]} – {periode_pasar[-1]} · "
+               f"{len(periode_pasar)} periode tersedia")
+    if tahun_market == "Semua tahun" and len(periode_pasar) < df_market['periode'].nunique():
+        st.caption("Tidak semua pasar memiliki data di setiap bulan; grafik hanya menampilkan observasi yang tersedia.")
     last_m = d['periode'].max()
+    st.markdown(f"**Harga terakhir tersedia: {periode_pasar[-1]}**")
     latest = d[d['periode'] == last_m].groupby('jenis_beras')['harga'].mean()
     cols = st.columns(max(len(latest), 1))
     for col, (jenis, val) in zip(cols, latest.items()):
@@ -1420,7 +1436,7 @@ elif menu == "market":
         bulan_cmp_opts = month_order(df_cmp_j)
         with cp2:
             bulan_cmp = st.selectbox(
-                "Periode:",
+                "Periode peringkat antar pasar:",
                 bulan_cmp_opts,
                 index=len(bulan_cmp_opts) - 1,
                 key="cmp_bulan_pasar",
@@ -1544,13 +1560,24 @@ elif menu == "gap":
         st.warning("Belum ada data ritel dan grosir dengan periode yang cocok.")
         st.stop()
 
+    tahun_gap_opts = sorted(df_gap['tahun'].unique().tolist())
+    st.caption("Tahun tersedia untuk perbandingan ritel dan grosir: " + ", ".join(map(str, tahun_gap_opts)))
+    tahun_gap = st.selectbox(
+        "Tahun selisih harga:", ["Semua tahun"] + tahun_gap_opts,
+        key="gap_year", format_func=str,
+    )
+    if tahun_gap != "Semua tahun":
+        df_gap = df_gap[df_gap['tahun'] == tahun_gap].copy()
+
     c1, c2 = st.columns(2)
     with c1:
-        selected_jenis = st.selectbox("Jenis Beras:", sorted(df_gap['jenis_beras'].unique()))
+        selected_jenis = st.selectbox("Jenis Beras:", sorted(df_gap['jenis_beras'].unique()), key="gap_jenis")
     d = df_gap[df_gap['jenis_beras'] == selected_jenis]
     with c2:
         bulan_opts = month_order(d)
-        selected_bulan = st.selectbox("Periode:", bulan_opts, index=len(bulan_opts) - 1)
+        selected_bulan = st.selectbox("Periode peringkat:", bulan_opts, index=len(bulan_opts) - 1, key="gap_periode")
+    st.caption(f"Riwayat jenis beras terpilih: {bulan_opts[0]} – {bulan_opts[-1]} · "
+               f"{len(bulan_opts)} periode tersedia. Peringkat dan KPI mengikuti periode yang dipilih.")
 
     has_prov = 'provinsi' in d.columns
     if has_prov:
