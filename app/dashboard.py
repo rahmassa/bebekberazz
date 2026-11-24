@@ -894,21 +894,63 @@ if menu == "home":
                 f.update_xaxes(range=[d['nilai'].min() * 0.9, d['nilai'].max() * 1.02])
             st.plotly_chart(style_fig(f, 300, False), use_container_width=True)
 
-# ------------------------- TREN -------------------------
+    # ------------------------- TREN -------------------------
     st.markdown("<br>", unsafe_allow_html=True)
+
     fig = go.Figure()
+
     if not df_grosir.empty:
-        fig.add_trace(go.Scatter(x=df_grosir['bulan_nama'], y=df_grosir['harga'],
-                                 name="Grosir (BPS)", mode="lines+markers",
-                                 line=dict(color="#F6C445", width=3),
-                                 fill="tozeroy", fillcolor="rgba(246,196,69,.08)"))
-    fig.add_trace(go.Scatter(x=ritel_bulan['bulan_nama'], y=ritel_bulan['avg_harga'],
-                             name="Ritel Provinsi (PIHPS)", mode="lines+markers",
-                             line=dict(color="#4299E1", width=3)))
-    fig.update_layout(title="Tren Harga: Grosir vs Ritel (Rp/kg)")
-    ys = list(ritel_bulan['avg_harga']) + list(df_grosir['harga'])
-    fig.update_yaxes(range=[min(ys) * 0.97, max(ys) * 1.03])
-    st.plotly_chart(style_fig(fig, 380), use_container_width=True)
+        fig.add_trace(go.Scatter(
+            x=df_grosir['periode'],
+            y=df_grosir['harga'],
+            name="Grosir (BPS)",
+            mode="lines+markers",
+            line=dict(color="#F6C445", width=3),
+            fill="tozeroy",
+            fillcolor="rgba(246,196,69,.08)"
+        ))
+
+    fig.add_trace(go.Scatter(
+        x=ritel_bulan['periode'],
+        y=ritel_bulan['avg_harga'],
+        name="Ritel Provinsi (PIHPS)",
+        mode="lines+markers",
+        line=dict(color="#4299E1", width=3)
+    ))
+
+    fig.update_layout(
+        title="Tren Harga: Grosir vs Ritel (Rp/kg)",
+        xaxis_title="Periode",
+        yaxis_title="Harga (Rp/kg)"
+    )
+
+    fig.update_xaxes(
+        type="date",
+        dtick="M1",
+        tickformat="%b %Y",
+        tickangle=-45,
+        hoverformat="%B %Y",
+        tickfont=dict(size=10)
+    )
+
+    ys = (
+        list(ritel_bulan['avg_harga'].dropna())
+        + list(df_grosir['harga'].dropna())
+    )
+
+    if ys:
+        fig.update_yaxes(
+            range=[min(ys) * 0.97, max(ys) * 1.03]
+        )
+
+    fig = style_fig(fig, 470)
+
+    fig.update_layout(
+        margin=dict(l=10, r=10, t=50, b=110),
+        legend=dict(orientation="h", y=-0.4, x=0)
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
 
     # ------------------------- PRODUKSI BERAS NASIONAL -------------------------
     try:
