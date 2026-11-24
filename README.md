@@ -51,7 +51,7 @@ Periode analisis diperluas dari Januari–Agustus 2026 menjadi **Februari 2024�
 | 🦆 Bebek Grosir | Badan Pusat Statistik (BPS) | Nasional × bulan | Rp/kg |
 | 🦆 Bebek Provinsi | PIHPS Bank Indonesia | Provinsi × jenis beras × bulan | Rp/kg |
 | 🦆 Bebek Pasar | SP2KP Kementerian Perdagangan | Provinsi × kabupaten/kota × pasar × jenis beras × bulan | Rp/kg |
-| 🦆 Bebek Produksi | Sumber statistik produksi (metadata menyusul) | Mengikuti wilayah dan periode data sumber | Mengikuti satuan sumber |
+| 🦆 Bebek Produksi | Sumber statistik produksi (metadata menyusul) | Mengikuti wilayah dan periode data sumber | Ton |
 
 ### 1. 🦆 Bebek Grosir — Harga Beras Grosir Nasional
 
@@ -93,7 +93,8 @@ Dataset tambahan yang digunakan untuk memberikan konteks sisi produksi dalam ana
 - Perbandingan tren produksi dan harga pada periode serta wilayah yang dapat disejajarkan.
 - Eksplorasi hubungan statistik antara produksi dan harga, tanpa mengasumsikan hubungan sebab-akibat.
 
-> Sumber resmi, cakupan wilayah, periode observasi, dan satuan dataset produksi perlu dilengkapi sesuai metadata data yang digunakan. Produksi padi (gabah) tidak otomatis disamakan dengan produksi beras.
+**Sumber:** [BDSP — Kementerian Pertanian Republik Indonesia]([https://sp2kp.kemendag.go.id/statistik/area](https://bdsp2.pertanian.go.id/bdsp/id/bulanan))
+
 
 ---
 
@@ -215,7 +216,7 @@ Nama schema dan tabel merupakan rancangan dokumentasi; sesuaikan dengan implemen
 | Price Range | Harga maksimum − harga minimum |
 | Volatility | Standar deviasi harga selama periode terpilih |
 | Price Gap | Selisih harga antara dua kelompok yang dibandingkan |
-| Rice Production | Volume produksi sesuai satuan dan agregasi yang valid pada sumber |
+| Rice Production | Volume produksi ton pada periode yang dipilih |
 
 MoM hanya dihitung jika data bulan sebelumnya tersedia dan nilai penyebut bukan nol.
 
@@ -241,10 +242,8 @@ Dashboard menjadi antarmuka utama untuk mengeksplorasi data dan hasil agregasi d
 | Province Analysis | Tren, statistik, perubahan harga, dan perbandingan provinsi |
 | Market Explorer | Eksplorasi harga dengan filter lokasi bertingkat |
 | Price Comparison | Perbandingan harga grosir, provinsi, dan pasar |
-| Market Comparison | Perbandingan dua atau lebih pasar — dalam pengembangan |
-| Rice Production Analysis | Eksplorasi data produksi — pengembangan analitik |
-
-> Dashboard telah memiliki alamat deployment, tetapi pembaruan periode data, integrasi produksi pada dashboard, dan fitur perbandingan antarpasar belum seluruhnya terkonfirmasi pada versi live.
+| Market Comparison | Perbandingan dua atau lebih pasar |
+| Rice Production Analysis | Eksplorasi data produksi |
 
 ---
 
@@ -325,18 +324,6 @@ Alternatifnya, akses [Live Dashboard](https://bebekberaz-calonpahlawan100.stream
 
 ---
 
-## 🚧 Project Status & Roadmap
-
-| Pembaruan | Status |
-| :--- | :--- |
-| Perluasan periode analisis Februari 2024–Agustus 2026 | Data diperbarui |
-| Penambahan dataset produksi beras | Dataset ditambahkan |
-| Deployment Streamlit | Link deployment tersedia |
-| Pembaruan dashboard sesuai data terbaru | Belum diperbarui |
-| Perbandingan antarpasar | Dalam pengembangan |
-| Analisis gabungan harga dan produksi | Rencana pengembangan analitik |
-
----
 
 ## ⚠️ Data Quality & Limitations
 
