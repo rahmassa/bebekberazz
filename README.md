@@ -232,8 +232,6 @@ Data produksi ditambahkan sebagai kelompok dataset baru. Integrasinya dengan ana
 
 ## 🖥️ Streamlit Dashboard
 
-**Deployment:** [bebekberaz-calonpahlawan100.streamlit.app](https://bebekberaz-calonpahlawan100.streamlit.app/)
-
 Dashboard menjadi antarmuka utama untuk mengeksplorasi data dan hasil agregasi dari data warehouse. Berikut cakupan halaman/modul berdasarkan dokumentasi awal dan pengembangan terbaru (nama halaman aktual dapat berbeda).
 
 | Halaman / Modul | Fokus |
@@ -341,7 +339,5 @@ Alternatifnya, akses [Live Dashboard](https://bebekberaz-calonpahlawan100.stream
 ### 🦆 BebekBerazz — From Raw Data to Rice Market Insights
 
 *Final Project · Data Warehousing · Indonesia*
-
-[Explore the Dashboard](https://bebekberaz-calonpahlawan100.streamlit.app/)
 
 </div>
