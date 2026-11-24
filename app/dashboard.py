@@ -894,28 +894,51 @@ if menu == "home":
                 f.update_xaxes(range=[d['nilai'].min() * 0.9, d['nilai'].max() * 1.02])
             st.plotly_chart(style_fig(f, 300, False), use_container_width=True)
 
-    # ------------------------- TREN -------------------------
+      # ------------------------- TREN -------------------------
     st.markdown("<br>", unsafe_allow_html=True)
+
+    # Rentang periode penuh dari gabungan data grosir & ritel
+    min_periode = min(df_grosir['periode'].min(), ritel_bulan['periode'].min())
+    max_periode = max(df_grosir['periode'].max(), ritel_bulan['periode'].max())
+
+    full_periods = pd.DataFrame({
+        'periode': pd.date_range(start=min_periode, end=max_periode, freq='MS')
+    })
+
+    # Merge grosir ke timeline penuh
+    grosir_plot = full_periods.merge(
+        df_grosir[['periode', 'harga']],
+        on='periode',
+        how='left'
+    )
+
+    # Merge ritel ke timeline penuh
+    ritel_plot = full_periods.merge(
+        ritel_bulan[['periode', 'avg_harga']],
+        on='periode',
+        how='left'
+    )
 
     fig = go.Figure()
 
-    if not df_grosir.empty:
-        fig.add_trace(go.Scatter(
-            x=df_grosir['periode'],
-            y=df_grosir['harga'],
-            name="Grosir (BPS)",
-            mode="lines+markers",
-            line=dict(color="#F6C445", width=3),
-            fill="tozeroy",
-            fillcolor="rgba(246,196,69,.08)"
-        ))
+    fig.add_trace(go.Scatter(
+        x=grosir_plot['periode'],
+        y=grosir_plot['harga'],
+        name="Grosir (BPS)",
+        mode="lines+markers",
+        line=dict(color="#F6C445", width=3),
+        fill="tozeroy",
+        fillcolor="rgba(246,196,69,.08)",
+        connectgaps=False
+    ))
 
     fig.add_trace(go.Scatter(
-        x=ritel_bulan['periode'],
-        y=ritel_bulan['avg_harga'],
+        x=ritel_plot['periode'],
+        y=ritel_plot['avg_harga'],
         name="Ritel Provinsi (PIHPS)",
         mode="lines+markers",
-        line=dict(color="#4299E1", width=3)
+        line=dict(color="#4299E1", width=3),
+        connectgaps=False
     ))
 
     fig.update_layout(
@@ -933,21 +956,19 @@ if menu == "home":
         tickfont=dict(size=10)
     )
 
-    ys = (
-        list(ritel_bulan['avg_harga'].dropna())
-        + list(df_grosir['harga'].dropna())
-    )
+    ys = []
+    if 'harga' in grosir_plot.columns:
+        ys += list(grosir_plot['harga'].dropna())
+    if 'avg_harga' in ritel_plot.columns:
+        ys += list(ritel_plot['avg_harga'].dropna())
 
     if ys:
-        fig.update_yaxes(
-            range=[min(ys) * 0.97, max(ys) * 1.03]
-        )
+        fig.update_yaxes(range=[min(ys) * 0.97, max(ys) * 1.03])
 
     fig = style_fig(fig, 470)
-
     fig.update_layout(
         margin=dict(l=10, r=10, t=50, b=110),
-        legend=dict(orientation="h", y=-0.4, x=0)
+        legend=dict(orientation="h", y=-0.35, x=0)
     )
 
     st.plotly_chart(fig, use_container_width=True)
