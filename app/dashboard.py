@@ -19,7 +19,7 @@ except ImportError:
 # 1. KONFIGURASI HALAMAN
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="BebekBerazzz Analytics",
+    page_title="BebekBerazz Analytics",
     page_icon="🦆",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -694,7 +694,7 @@ with st.sidebar:
         h1, h2 = st.columns([5, 1])
         with h1:
             st.image("https://img.icons8.com/emoji/96/duck-emoji.png", width=56)
-            st.markdown("### BebekBerazz")
+            st.markdown("### BebekBerazzzzz")
             st.caption("Data Warehouse & Rice Price Intelligence")
         with h2:
             st.button("", icon=":material/chevron_left:", key="toggle",
