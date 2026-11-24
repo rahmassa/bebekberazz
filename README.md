@@ -238,12 +238,10 @@ Dashboard menjadi antarmuka utama untuk mengeksplorasi data dan hasil agregasi d
 
 | Halaman / Modul | Fokus |
 | :--- | :--- |
-| National Overview | Harga grosir nasional dan ringkasan harga provinsi |
+| National Overview | Harga grosir nasional dan ringkasan harga provinsi, perbandingan dengan produksi |
 | Province Analysis | Tren, statistik, perubahan harga, dan perbandingan provinsi |
-| Market Explorer | Eksplorasi harga dengan filter lokasi bertingkat |
+| Market Explorer | Eksplorasi harga dengan filter lokasi bertingkat serta antar pasar |
 | Price Comparison | Perbandingan harga grosir, provinsi, dan pasar |
-| Market Comparison | Perbandingan dua atau lebih pasar |
-| Rice Production Analysis | Eksplorasi data produksi |
 
 ---
 
