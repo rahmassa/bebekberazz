@@ -764,17 +764,52 @@ if menu == "home":
     st.subheader("🏠 Ringkasan Nasional")
 
     try:
-        df_grosir = load_data("SELECT * FROM db_grosir.harga_nasional_bulanan ORDER BY bulan_num")
+        df_grosir = load_data(
+            "SELECT * FROM db_grosir.harga_nasional_bulanan ORDER BY tahun, bulan_num"
+        )
     except Exception:
-        df_grosir = pd.DataFrame(columns=['bulan_num', 'bulan_nama', 'harga'])
-    df_prov = safe_load("SELECT * FROM province_summary")
+        df_grosir = pd.DataFrame(
+            columns=['tahun', 'bulan_num', 'bulan_nama', 'harga']
+        )
 
-    ritel_bulan = (df_prov.groupby(['bulan_num', 'bulan_nama'])['avg_harga']
-                   .mean().reset_index().sort_values('bulan_num'))
+    df_prov = safe_load(
+        "SELECT * FROM province_summary ORDER BY tahun, bulan_num"
+    )
 
-    last_m = df_prov['bulan_num'].max()
-    last_prov = (df_prov[df_prov['bulan_num'] == last_m]
-                 .groupby('provinsi')['avg_harga'].mean().sort_values(ascending=False))
+    # Membuat tanggal berdasarkan tahun dan bulan
+    df_prov['periode'] = pd.to_datetime(dict(
+        year=df_prov['tahun'],
+        month=df_prov['bulan_num'],
+        day=1
+    ))
+
+    df_grosir['periode'] = pd.to_datetime(dict(
+        year=df_grosir['tahun'],
+        month=df_grosir['bulan_num'],
+        day=1
+    ))
+
+    df_grosir = df_grosir.sort_values('periode')
+
+    # Rata-rata ritel berdasarkan bulan dan tahun
+    ritel_bulan = (
+        df_prov.groupby(
+            ['periode', 'tahun', 'bulan_num', 'bulan_nama']
+        )['avg_harga']
+        .mean()
+        .reset_index()
+        .sort_values('periode')
+    )
+
+    # Mengambil periode terbaru
+    last_m = df_prov['periode'].max()
+
+    last_prov = (
+        df_prov[df_prov['periode'] == last_m]
+        .groupby('provinsi')['avg_harga']
+        .mean()
+        .sort_values(ascending=False)
+    )
 
     grosir_last = df_grosir['harga'].iloc[-1] if not df_grosir.empty else 0
     ritel_last = ritel_bulan['avg_harga'].iloc[-1]
