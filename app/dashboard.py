@@ -186,6 +186,8 @@ def load_data(query: str) -> pd.DataFrame:
     try:
         if os.path.exists("databases/bebek_grosir.duckdb"):
             conn.execute("ATTACH IF NOT EXISTS 'databases/bebek_grosir.duckdb' AS db_grosir;")
+        if os.path.exists("databases/bebek_produksi.duckdb"):
+            conn.execute("ATTACH IF NOT EXISTS 'databases/bebek_produksi.duckdb' AS db_produksi (READ_ONLY);")
         return conn.execute(query).df()
     finally:
         conn.close()
@@ -875,7 +877,7 @@ if menu == "home":
 
     # ------------------------- PRODUKSI BERAS NASIONAL -------------------------
     try:
-        df_prod = load_data("SELECT * FROM produksi_summary ORDER BY tahun, bulan_num")
+        df_prod = load_data("SELECT * FROM db_produksi.produksi_beras ORDER BY periode")
     except Exception:
         df_prod = pd.DataFrame(columns=['tahun', 'bulan_num', 'bulan_nama', 'produksi_ton'])
 
@@ -948,6 +950,182 @@ if menu == "home":
         )
         fig_prod.update_yaxes(range=[0, dp['produksi_ton'].max() * 1.15])
         st.plotly_chart(style_fig(fig_prod, 400), use_container_width=True)
+
+        # ---------------- PERBANDINGAN PRODUKSI & HARGA PASAR ----------------
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.divider()
+        st.markdown("##### 📊 Perbandingan Produksi Beras dan Harga Pasar")
+        st.markdown(
+            '<p class="section-note">Harga pasar dihitung sebagai rata-rata '
+            'harga Beras Medium dari pasar yang tercatat pada bulan yang sama.</p>',
+            unsafe_allow_html=True,
+        )
+
+        try:
+            df_market_cmp = load_data("SELECT * FROM market_summary")
+        except Exception as e:
+            df_market_cmp = pd.DataFrame()
+            st.warning(f"Data harga pasar belum dapat dibaca: {e}")
+
+        # Pencocokan hanya valid jika data harga pasar memiliki kolom tahun.
+        if df_market_cmp.empty:
+            st.info("Data harga pasar belum tersedia untuk dibandingkan.")
+        elif "tahun" not in df_market_cmp.columns:
+            st.warning(
+                "Perbandingan belum dihitung karena tabel market_summary belum memiliki "
+                "kolom tahun. Kolom tahun diperlukan agar Februari 2024 tidak tercampur "
+                "dengan Februari 2025. Tambahkan tahun pada proses transformasi data SP2KP."
+            )
+        else:
+            # Pilih kategori Medium sebagai pembanding utama.
+            medium_mask = df_market_cmp["jenis_beras"].astype(str).str.contains(
+                "medium", case=False, na=False
+            )
+            df_medium = df_market_cmp.loc[medium_mask].copy()
+
+            if df_medium.empty:
+                st.warning(
+                    "Kategori Beras Medium tidak ditemukan pada data pasar. "
+                    "Periksa penamaan pada kolom jenis_beras."
+                )
+            else:
+                # Agregasi seluruh pasar per tahun-bulan. Setiap baris pasar
+                # menjadi satu observasi dalam rata-rata sederhana.
+                harga_bulanan = (
+                    df_medium.groupby(["tahun", "bulan_num"], as_index=False)
+                    .agg(
+                        harga_pasar_rata=("harga", "mean"),
+                        jumlah_observasi=("harga", "count"),
+                    )
+                )
+
+                produksi_bulanan = (
+                    df_prod.groupby(["tahun", "bulan_num"], as_index=False)
+                    .agg(produksi_ton=("produksi_ton", "mean"))
+                )
+
+                perbandingan = produksi_bulanan.merge(
+                    harga_bulanan,
+                    on=["tahun", "bulan_num"],
+                    how="inner",
+                )
+
+                nama_bulan = {
+                    1: "Januari", 2: "Februari", 3: "Maret", 4: "April",
+                    5: "Mei", 6: "Juni", 7: "Juli", 8: "Agustus",
+                    9: "September", 10: "Oktober", 11: "November", 12: "Desember",
+                }
+
+                if perbandingan.empty:
+                    st.info(
+                        "Belum ada pasangan periode tahun-bulan yang cocok antara "
+                        "data produksi dan harga pasar."
+                    )
+                else:
+                    perbandingan["bulan_nama"] = perbandingan["bulan_num"].map(nama_bulan)
+                    perbandingan["periode_label"] = (
+                        perbandingan["bulan_nama"] + " " +
+                        perbandingan["tahun"].astype(str)
+                    )
+                    perbandingan = perbandingan.sort_values(["tahun", "bulan_num"])
+
+                    st.caption(
+                        f"Periode yang berhasil dicocokkan: {len(perbandingan)} bulan · "
+                        "Kategori harga: Beras Medium · Agregasi: rata-rata sederhana antarobservasi pasar"
+                    )
+
+                    fig_compare = go.Figure()
+                    fig_compare.add_trace(go.Scatter(
+                        x=perbandingan["periode_label"],
+                        y=perbandingan["produksi_ton"],
+                        name="Produksi (ton)",
+                        mode="lines+markers",
+                        line=dict(color="#48BB78", width=3),
+                        yaxis="y",
+                    ))
+                    fig_compare.add_trace(go.Scatter(
+                        x=perbandingan["periode_label"],
+                        y=perbandingan["harga_pasar_rata"],
+                        name="Rata-rata harga Medium (Rp/kg)",
+                        mode="lines+markers",
+                        line=dict(color="#F6C445", width=3),
+                        yaxis="y2",
+                    ))
+                    fig_compare.update_layout(
+                        title="Tren Produksi Beras vs Rata-rata Harga Pasar Medium",
+                        xaxis_title="Periode",
+                        yaxis=dict(title="Produksi (ton)", side="left"),
+                        yaxis2=dict(
+                            title="Harga pasar (Rp/kg)",
+                            overlaying="y",
+                            side="right",
+                            showgrid=False,
+                        ),
+                        legend=dict(orientation="h", y=-0.25, x=0),
+                    )
+                    st.plotly_chart(
+                        style_fig(fig_compare, 440, False),
+                        use_container_width=True,
+                    )
+
+                    if len(perbandingan) >= 2:
+                        korelasi = perbandingan[
+                            ["produksi_ton", "harga_pasar_rata"]
+                        ].corr(method="pearson").iloc[0, 1]
+                        kc1, kc2, kc3 = st.columns(3)
+                        with kc1:
+                            kpi(
+                                "Korelasi Pearson",
+                                f"{korelasi:.3f}" if pd.notna(korelasi) else "-",
+                                note="Produksi vs harga pasar Medium",
+                            )
+                        with kc2:
+                            kpi(
+                                "Rata-rata Produksi",
+                                f"{perbandingan['produksi_ton'].mean():,.0f} ton",
+                                note="Pada periode yang cocok",
+                            )
+                        with kc3:
+                            kpi(
+                                "Rata-rata Harga Pasar",
+                                rp(perbandingan["harga_pasar_rata"].mean()),
+                                note="Beras Medium (Rp/kg)",
+                            )
+
+                        if pd.isna(korelasi):
+                            interpretasi = "Korelasi tidak dapat dihitung karena salah satu variabel tidak bervariasi."
+                        elif korelasi <= -0.5:
+                            interpretasi = "Hubungan linear negatif cukup kuat: produksi yang lebih tinggi cenderung beriringan dengan harga yang lebih rendah."
+                        elif korelasi < -0.2:
+                            interpretasi = "Hubungan linear negatif lemah hingga sedang."
+                        elif korelasi < 0.2:
+                            interpretasi = "Hubungan linear sangat lemah atau hampir tidak terlihat."
+                        elif korelasi < 0.5:
+                            interpretasi = "Hubungan linear positif lemah hingga sedang."
+                        else:
+                            interpretasi = "Hubungan linear positif cukup kuat."
+                        insight(
+                            interpretasi +
+                            " Korelasi menunjukkan keterkaitan, bukan bukti sebab-akibat."
+                        )
+
+                    with st.expander("📋 Lihat data hasil pencocokan produksi dan harga"):
+                        st.dataframe(
+                            perbandingan[
+                                ["tahun", "bulan_nama", "produksi_ton",
+                                 "harga_pasar_rata", "jumlah_observasi"]
+                            ].rename(columns={
+                                "tahun": "Tahun",
+                                "bulan_nama": "Bulan",
+                                "produksi_ton": "Produksi (ton)",
+                                "harga_pasar_rata": "Rata-rata harga Medium (Rp/kg)",
+                                "jumlah_observasi": "Jumlah observasi pasar",
+                            }).style.format({
+                                "Produksi (ton)": "{:,.0f}",
+                                "Rata-rata harga Medium (Rp/kg)": "Rp {:,.0f}",
+                            }),
+                            use_container_width=True,
+                        )
 
 # -----------------------------------------------------------------------------
 # HALAMAN 2: ANALISIS PROVINSI
