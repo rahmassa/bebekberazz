@@ -19,7 +19,7 @@ except ImportError:
 # 1. KONFIGURASI HALAMAN
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="BebekBerazz Analytics",
+    page_title="BebekBerazzz Analytics",
     page_icon="🦆",
     layout="wide",
     initial_sidebar_state="expanded",
